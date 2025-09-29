@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@googlemaps/react-wrapper": "^1.2.0",
+    "framer-motion": "^12.23.22",
     "leaflet.heat": "^0.2.0",
     "next": "15.5.0",
     "react": "19.1.0",

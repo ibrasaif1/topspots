@@ -38,7 +38,7 @@ declare global {
       maps: {
         Map: new (element: HTMLElement, options: Record<string, unknown>) => GoogleMapsMap;
         Marker: new (options: Record<string, unknown>) => GoogleMapsMarker;
-        InfoWindow: new (options: Record<string, unknown>) => GoogleMapsInfoWindow;
+        InfoWindow: new (options?: Record<string, unknown>) => GoogleMapsInfoWindow;
         LatLngBounds: new () => GoogleMapsBounds;
         Polygon: new (options: Record<string, unknown>) => GoogleMapsPolygon;
         Size: new (width: number, height: number) => unknown;

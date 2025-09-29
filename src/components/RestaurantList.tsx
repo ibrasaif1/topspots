@@ -77,7 +77,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     mapInstanceRef.current = map;
 
     // Create bounds to fit all restaurants
-    const bounds = new google.maps.LatLngBounds();
+    const bounds = new google.maps.LatLngBounds() as any;
     let hasValidCoordinates = false;
 
     restaurants.forEach((restaurant) => {

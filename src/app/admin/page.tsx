@@ -1,14 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { SUPPORTED_CITIES, getCityByName } from "@/config/cities";
+import { SUPPORTED_CITIES } from "@/config/cities";
 
 export default function AdminPage() {
   const [city, setCity] = useState("");
   const [loading, setLoading] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [costEstimate, setCostEstimate] = useState<number | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{
+    data?: { city: string; places: any[] };
+    totalHydrated: number;
+    elapsedSec: number;
+    saved: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const estimateCost = async () => {
@@ -23,12 +28,11 @@ export default function AdminPage() {
       if (!response.ok) throw new Error(`Error: ${response.status}`);
       
       const data = await response.json();
-      const restaurantCount = data.restaurantCount || 0;
       const estimatedCost = data.estimatedCost || 0;
       
       setCostEstimate(estimatedCost);
-    } catch (err: any) {
-      setError(err.message || "Failed to estimate cost");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to estimate cost");
       setCostEstimate(null);
     } finally {
       setEstimating(false);
@@ -48,8 +52,8 @@ export default function AdminPage() {
       
       const data = await response.json();
       setResult(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch restaurants");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch restaurants");
     } finally {
       setLoading(false);
     }
@@ -154,7 +158,7 @@ export default function AdminPage() {
             <div>
               <h3 className="font-semibold text-gray-800">What to test:</h3>
               <ul className="list-disc ml-6 mt-2 space-y-1">
-                <li>Click "Estimate Cost" first to see API call cost</li>
+                <li>Click &quot;Estimate Cost&quot; first to see API call cost</li>
                 <li>Verify the sample restaurant has all required fields</li>
                 <li>Check that gps_coordinates has latitude/longitude</li>
                 <li>Ensure rating and userRatingCount are present</li>

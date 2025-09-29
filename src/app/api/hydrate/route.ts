@@ -13,7 +13,7 @@ interface PlaceDetails {
   rating?: number;
   userRatingCount?: number;
   priceLevel?: string;
-  priceRange?: any;
+  priceRange?: Record<string, unknown>;
   location?: {
     latitude: number;
     longitude: number;
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     try {
       const fileContent = await readFile(filePath, 'utf8');
       existingData = JSON.parse(fileContent);
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'No place IDs found. Run /api/collect first.' }, { status: 404 });
     }
 
@@ -60,14 +60,14 @@ export async function GET(request: NextRequest) {
       const placeIdsContent = await readFile(placeIdsPath, 'utf8');
       const placeIdsData = JSON.parse(placeIdsContent);
       placeIds = placeIdsData.placeIds || [];
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'No place IDs found. Run /api/collect first.' }, { status: 404 });
     }
 
     console.log(`Found ${placeIds.length} total place IDs`);
     
     // Get existing place IDs to skip duplicates
-    const existingPlaceIds = new Set((existingData.places || []).map((p: any) => p.placeId));
+    const existingPlaceIds = new Set((existingData.places || []).map((p: { placeId: string }) => p.placeId));
     console.log(`Found ${existingPlaceIds.size} existing places to skip`);
     
     // Filter out already processed place IDs
@@ -169,9 +169,9 @@ export async function GET(request: NextRequest) {
       progress: `${endIndex}/${unprocessedPlaceIds.length} (${Math.round(endIndex/unprocessedPlaceIds.length*100)}%)`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 

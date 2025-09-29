@@ -9,7 +9,7 @@ export default function AdminPage() {
   const [estimating, setEstimating] = useState(false);
   const [costEstimate, setCostEstimate] = useState<number | null>(null);
   const [result, setResult] = useState<{
-    data?: { city: string; places: any[] };
+    data?: { city: string; places: Record<string, unknown>[] };
     totalHydrated: number;
     elapsedSec: number;
     saved: string;

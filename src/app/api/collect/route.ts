@@ -20,7 +20,7 @@ interface PlaceDetails {
   rating?: number;
   userRatingCount?: number;
   priceLevel?: string;
-  priceRange?: any;
+  priceRange?: Record<string, unknown>;
   location?: {
     latitude: number;
     longitude: number;
@@ -110,9 +110,9 @@ export async function GET(request: NextRequest) {
       places: hydrationResult.places
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -181,7 +181,6 @@ async function collectPlaceIds(city: string, apiKey: string): Promise<string[]> 
 
 async function getPolygonCountFromAPI(polygon: Coordinate[]): Promise<number> {
   // Create a temporary city object to pass to the count API
-  const tempCity = encodeURIComponent('temp_polygon');
   
   // We'll need to temporarily store this polygon somewhere the count API can access it
   // For now, let's use the direct approach with a custom area

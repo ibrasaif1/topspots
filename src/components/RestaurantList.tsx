@@ -18,7 +18,8 @@ interface GoogleMapsMarker {
 
 interface GoogleMapsInfoWindow {
   close: () => void;
-  open: (map: unknown, marker: unknown) => void;
+  open: (map: unknown, anchor: unknown) => void;
+  setContent: (content: string | Node) => void;
 }
 
 interface GoogleMapsMap {
@@ -60,6 +61,127 @@ type Restaurant = {
   thumbnail?: string; // retained in type for compatibility
   price?: string;
   cuisine?: string;
+  priceRange?: string;
+};
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return char;
+    }
+  });
+
+const formatPriceLevel = (price?: string) => {
+  if (!price) return "";
+
+  const normalized = price.toUpperCase();
+  const priceMap: Record<string, string> = {
+    PRICE_LEVEL_INEXPENSIVE: "$",
+    PRICE_LEVEL_MODERATE: "$$",
+    PRICE_LEVEL_EXPENSIVE: "$$$",
+    PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
+    PRICE_LEVEL_ONE: "$",
+    PRICE_LEVEL_TWO: "$$",
+    PRICE_LEVEL_THREE: "$$$",
+    PRICE_LEVEL_FOUR: "$$$$"
+  };
+
+  if (priceMap[normalized]) {
+    return priceMap[normalized];
+  }
+
+  if (/^\$+/.test(price)) {
+    return price;
+  }
+
+  return price;
+};
+
+type RawPriceAmount = {
+  currencyCode?: string;
+  units?: string | number;
+  nanos?: string | number;
+};
+
+const formatPriceAmount = (amount?: RawPriceAmount) => {
+  if (!amount) return "";
+
+  const currency = typeof amount.currencyCode === "string" && amount.currencyCode.trim()
+    ? amount.currencyCode
+    : "USD";
+
+  const parsedUnits = typeof amount.units === "string"
+    ? Number(amount.units)
+    : typeof amount.units === "number"
+      ? amount.units
+      : NaN;
+
+  if (Number.isNaN(parsedUnits)) {
+    return "";
+  }
+
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  });
+
+  return formatter.format(parsedUnits);
+};
+
+const derivePriceRangeLabel = (priceRange: unknown): string => {
+  if (!priceRange || typeof priceRange !== "object") return "";
+
+  const { startPrice, endPrice } = priceRange as {
+    startPrice?: RawPriceAmount;
+    endPrice?: RawPriceAmount;
+  };
+
+  const start = formatPriceAmount(startPrice);
+  const end = formatPriceAmount(endPrice);
+
+  if (start && end) return `${start} - ${end}`;
+  if (start) return `${start}+`;
+  if (end) return `Up to ${end}`;
+  return "";
+};
+
+const formatInfoContent = (restaurant: Restaurant) => {
+  const ratingLine = restaurant.rating
+    ? `⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews`
+    : "";
+
+  const priceLevel = formatPriceLevel(restaurant.price);
+  const priceRange = restaurant.priceRange ?? "";
+
+  const detailParts: string[] = [];
+  if (restaurant.cuisine) detailParts.push(escapeHtml(restaurant.cuisine));
+  if (priceLevel) detailParts.push(priceLevel);
+  if (priceRange) detailParts.push(escapeHtml(priceRange));
+
+  const address = restaurant.address && /^https?:\/\//i.test(restaurant.address)
+    ? ""
+    : restaurant.address;
+
+  return `
+    <div style="padding: 8px; max-width: 220px;">
+      <div style="font-weight: 600; font-size: 14px; color: #1f2937;">${escapeHtml(restaurant.name)}</div>
+      ${ratingLine ? `<div style="color: #6b7280; margin-top: 4px;">${ratingLine}</div>` : ""}
+      ${detailParts.length ? `<div style="color: #4b5563; font-size: 12px; margin-top: 6px;">${detailParts.join(" · ")}</div>` : ""}
+      ${address ? `<div style="color: #9ca3af; font-size: 12px; margin-top: 8px;">${escapeHtml(address)}</div>` : ""}
+    </div>
+  `;
 };
 
 function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: { 
@@ -106,6 +228,10 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     const bounds = new google.maps.LatLngBounds();
     let hasValidCoordinates = false;
 
+    const infoWindow = new google.maps.InfoWindow();
+    infoWindowRef.current = infoWindow;
+    let closeTimeout: number | null = null;
+
     restaurants.forEach((restaurant) => {
       if (!restaurant.gps_coordinates?.latitude || !restaurant.gps_coordinates?.longitude) return;
 
@@ -133,34 +259,35 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
         }
       });
 
-      marker.addListener('click', () => {
-        // Close any existing info window
-        if (infoWindowRef.current) {
-          infoWindowRef.current.close();
+      const openInfoWindow = () => {
+        if (closeTimeout) {
+          window.clearTimeout(closeTimeout);
+          closeTimeout = null;
         }
-        
-        // Create new info window
-        const infoWindow = new google.maps.InfoWindow({
-          content: `
-            <div style="padding: 8px; max-width: 200px;">
-              <div style="font-weight: 600; font-size: 14px; color: #1f2937;">${restaurant.name}</div>
-              <div style="color: #6b7280; margin-top: 4px;">⭐ ${restaurant.rating?.toFixed(1)} · ${restaurant.reviews?.toLocaleString()} reviews</div>
-              <div style="color: #9ca3af; font-size: 12px; margin-top: 8px;">${restaurant.address}</div>
-            </div>
-          `
-        });
-        
-        // Store reference and open
-        infoWindowRef.current = infoWindow;
+        const content = formatInfoContent(restaurant);
+        infoWindow.setContent(content);
         infoWindow.open(map, marker);
+      };
+
+      const scheduleCloseInfoWindow = () => {
+        closeTimeout = window.setTimeout(() => {
+          infoWindow.close();
+          closeTimeout = null;
+        }, 150);
+      };
+
+      marker.addListener('click', () => {
+        openInfoWindow();
       });
 
       marker.addListener('mouseover', () => {
         onMarkerHover(restaurant.place_id);
+        openInfoWindow();
       });
 
       marker.addListener('mouseout', () => {
         onMarkerHover(null);
+        scheduleCloseInfoWindow();
       });
 
       markersRef.current[restaurant.place_id] = marker;
@@ -205,6 +332,10 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     }
 
     return () => {
+      if (closeTimeout) {
+        window.clearTimeout(closeTimeout);
+        closeTimeout = null;
+      }
       Object.values(markersRef.current).forEach(marker => marker.setMap(null));
       markersRef.current = {};
       if (infoWindowRef.current) {
@@ -277,14 +408,15 @@ export default function RestaurantList({ city }: { city?: string }) {
           } else if (data.places && Array.isArray(data.places)) {
             // Convert new format to old format for compatibility
             const convertedRestaurants = data.places.map((place: Record<string, unknown>) => ({
-              place_id: place.placeId || place.id,
-              name: place.name,
-              rating: place.rating || 0,
-              reviews: place.userRatingCount || 0,
-              address: place.googleMapsUri || "",
-              gps_coordinates: place.location || { latitude: 0, longitude: 0 },
-              price: place.priceLevel || "",
-              cuisine: place.primaryTypeDisplayName || place.primaryType || "Restaurant"
+              place_id: (place.placeId as string) || (place.id as string),
+              name: place.name as string,
+              rating: (place.rating as number) || 0,
+              reviews: (place.userRatingCount as number) || 0,
+              address: (place.googleMapsUri as string) || "",
+              gps_coordinates: (place.location as { latitude: number; longitude: number }) || { latitude: 0, longitude: 0 },
+              price: place.priceLevel as string,
+              cuisine: (place.primaryTypeDisplayName as string) || (place.primaryType as string) || "Restaurant",
+              priceRange: derivePriceRangeLabel(place.priceRange)
             }));
             setRestaurants(convertedRestaurants);
           } else {
@@ -326,7 +458,7 @@ export default function RestaurantList({ city }: { city?: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Google Map */}
         <div className="lg:sticky lg:top-24 h-[700px] bg-white rounded-lg border border-neutral-200 overflow-hidden">
-          <Wrapper apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""} render={() => <div />}>
+          <Wrapper apiKey={process.env.GOOGLE_MAPS_API_KEY || ""} render={() => <div />}>
             <GoogleMap 
               restaurants={items}
               hoveredRestaurant={hoveredRestaurant}

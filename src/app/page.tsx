@@ -55,20 +55,6 @@ export default function LandingPage() {
   const router = useRouter();
   const selectedCity = searchParams.get('city');
   
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleCityClick = (cityName: string) => {
     router.push(`/?city=${encodeURIComponent(cityName)}`);
@@ -153,7 +139,7 @@ export default function LandingPage() {
           transition={{ duration: 0.8 }}
           className={`${cities.length === 2 ? 'max-w-2xl' : 'max-w-4xl'} mx-auto`}
         >
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative">
             <button
               disabled
               className="px-6 py-3 bg-gray-100 text-gray-400 rounded-2xl w-full flex items-center justify-between border border-gray-200 cursor-not-allowed opacity-60"

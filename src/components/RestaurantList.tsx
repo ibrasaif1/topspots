@@ -7,10 +7,21 @@ import { getCityByName } from "@/config/cities";
 // Declare google maps types for TypeScript
 declare global {
   interface Window {
-    google: any;
+    google: {
+      maps: {
+        Map: new (element: HTMLElement, options: Record<string, unknown>) => unknown;
+        Marker: new (options: Record<string, unknown>) => unknown;
+        InfoWindow: new (options: Record<string, unknown>) => unknown;
+        LatLngBounds: new () => unknown;
+        Polygon: new (options: Record<string, unknown>) => unknown;
+        Size: new (width: number, height: number) => unknown;
+        Point: new (x: number, y: number) => unknown;
+        Animation: { BOUNCE: unknown };
+      };
+    };
   }
 }
-declare const google: any;
+declare const google: typeof window.google;
 
 type Restaurant = {
   place_id: string;
@@ -32,9 +43,9 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
   city: string
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<{ [key: string]: any }>({});
-  const infoWindowRef = useRef<any>(null);
+  const mapInstanceRef = useRef<unknown>(null);
+  const markersRef = useRef<{ [key: string]: unknown }>({});
+  const infoWindowRef = useRef<unknown>(null);
 
   useEffect(() => {
     if (!mapRef.current) return;

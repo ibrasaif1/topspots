@@ -9,15 +9,37 @@ interface GoogleMapsBounds {
   extend: (position: { lat: number; lng: number }) => void;
 }
 
+interface GoogleMapsMarker {
+  addListener: (event: string, callback: () => void) => void;
+  setAnimation: (animation: unknown) => void;
+  setIcon: (icon: Record<string, unknown>) => void;
+  setMap: (map: unknown) => void;
+}
+
+interface GoogleMapsInfoWindow {
+  close: () => void;
+  open: (map: unknown, marker: unknown) => void;
+}
+
+interface GoogleMapsMap {
+  fitBounds: (bounds: unknown, padding?: Record<string, number>) => void;
+  setCenter: (center: { lat: number; lng: number }) => void;
+  setZoom: (zoom: number) => void;
+}
+
+interface GoogleMapsPolygon {
+  setMap: (map: unknown) => void;
+}
+
 declare global {
   interface Window {
     google: {
       maps: {
-        Map: new (element: HTMLElement, options: Record<string, unknown>) => unknown;
-        Marker: new (options: Record<string, unknown>) => unknown;
-        InfoWindow: new (options: Record<string, unknown>) => unknown;
+        Map: new (element: HTMLElement, options: Record<string, unknown>) => GoogleMapsMap;
+        Marker: new (options: Record<string, unknown>) => GoogleMapsMarker;
+        InfoWindow: new (options: Record<string, unknown>) => GoogleMapsInfoWindow;
         LatLngBounds: new () => GoogleMapsBounds;
-        Polygon: new (options: Record<string, unknown>) => unknown;
+        Polygon: new (options: Record<string, unknown>) => GoogleMapsPolygon;
         Size: new (width: number, height: number) => unknown;
         Point: new (x: number, y: number) => unknown;
         Animation: { BOUNCE: unknown };
@@ -47,9 +69,9 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
   city: string
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<unknown>(null);
-  const markersRef = useRef<{ [key: string]: unknown }>({});
-  const infoWindowRef = useRef<unknown>(null);
+  const mapInstanceRef = useRef<GoogleMapsMap | null>(null);
+  const markersRef = useRef<{ [key: string]: GoogleMapsMarker }>({});
+  const infoWindowRef = useRef<GoogleMapsInfoWindow | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) return;

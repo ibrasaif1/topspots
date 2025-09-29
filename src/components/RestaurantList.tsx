@@ -326,7 +326,7 @@ export default function RestaurantList({ city }: { city?: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Google Map */}
         <div className="lg:sticky lg:top-24 h-[700px] bg-white rounded-lg border border-neutral-200 overflow-hidden">
-          <Wrapper apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""} render={() => null}>
+          <Wrapper apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""} render={() => <div />}>
             <GoogleMap 
               restaurants={items}
               hoveredRestaurant={hoveredRestaurant}

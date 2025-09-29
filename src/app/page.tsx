@@ -71,7 +71,6 @@ function LandingPageContent() {
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">TopSpots</h1>
               <h2 className="text-lg text-gray-600">{selectedCity}</h2>
-              <CityRestaurantCount cityName={selectedCity} />
             </div>
           </div>
         </header>
@@ -101,7 +100,7 @@ function LandingPageContent() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-xl md:text-2xl text-gray-700 mb-12 max-w-2xl mx-auto leading-relaxed"
         >
-          Discover the highest-rated restaurants in your city or plan your next trip powered by real Google Maps reviews and ratings
+          Discover the highest-rated restaurants in your city — exclusively featuring establishments with 4.5+ stars and 1,000+ verified Google reviews
         </motion.p>
 
         {/* City cards container - this sets the width reference */}
@@ -126,7 +125,6 @@ function LandingPageContent() {
               
               <div className="p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">{city.name}</h2>
-                <p className="text-gray-600 font-medium">{city.count} restaurants rated</p>
               </div>
             </div>
           ))}

@@ -100,7 +100,7 @@ function LandingPageContent() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-xl md:text-2xl text-gray-700 mb-12 max-w-2xl mx-auto leading-relaxed"
         >
-          Discover the highest-rated restaurants in your city — exclusively featuring establishments with 4.5+ stars and 1,000+ verified Google reviews
+          Discover the highest-rated restaurants in your city, exclusively featuring establishments with 4.5+ stars and 1,000+ verified Google reviews
         </motion.p>
 
         {/* City cards container - this sets the width reference */}

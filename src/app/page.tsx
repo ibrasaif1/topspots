@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import RestaurantList from "../components/RestaurantList";
@@ -50,7 +50,7 @@ function CityRestaurantCount({ cityName }: { cityName: string }) {
   return <span className="text-sm text-gray-500">{count.toLocaleString()} restaurants (4.5+ stars)</span>;
 }
 
-export default function LandingPage() {
+function LandingPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const selectedCity = searchParams.get('city');
@@ -160,5 +160,15 @@ export default function LandingPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 flex items-center justify-center">
+      <div className="text-xl text-gray-600">Loading...</div>
+    </div>}>
+      <LandingPageContent />
+    </Suspense>
   );
 }

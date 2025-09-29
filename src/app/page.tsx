@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import RestaurantList from "../components/RestaurantList";
-import { SUPPORTED_CITIES, getCityByName } from "@/config/cities";
+import { getCityByName } from "@/config/cities";
 
 const cities = [
   {
@@ -55,7 +55,6 @@ export default function LandingPage() {
   const router = useRouter();
   const selectedCity = searchParams.get('city');
   
-  const [newCityDropdown] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

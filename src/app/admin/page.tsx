@@ -139,7 +139,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 
-                {result.data?.places?.length > 0 && (
+                {result.data?.places && result.data.places.length > 0 && (
                   <div className="mt-4">
                     <p className="font-medium text-green-700 mb-2">Sample Restaurant:</p>
                     <pre className="bg-white p-3 rounded text-xs overflow-auto max-h-40">

@@ -331,7 +331,7 @@ export default function RestaurantList({ city }: { city?: string }) {
               restaurants={items}
               hoveredRestaurant={hoveredRestaurant}
               onMarkerHover={setHoveredRestaurant}
-              city={city}
+              city={city || ""}
             />
           </Wrapper>
         </div>

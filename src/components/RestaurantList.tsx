@@ -4,6 +4,14 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Wrapper } from "@googlemaps/react-wrapper";
 import { getCityByName } from "@/config/cities";
 
+// Declare google maps types for TypeScript
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+declare const google: any;
+
 type Restaurant = {
   place_id: string;
   name: string;
@@ -24,9 +32,9 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
   city: string
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<{ [key: string]: google.maps.Marker }>({});
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<{ [key: string]: any }>({});
+  const infoWindowRef = useRef<any>(null);
 
   useEffect(() => {
     if (!mapRef.current) return;

@@ -55,10 +55,7 @@ export default function LandingPage() {
   const router = useRouter();
   const selectedCity = searchParams.get('city');
   
-  const [newCityDropdown, setNewCityDropdown] = useState("");
-  const [estimating, setEstimating] = useState(false);
-  const [costEstimate, setCostEstimate] = useState<number | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [newCityDropdown] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,40 +75,8 @@ export default function LandingPage() {
     router.push(`/?city=${encodeURIComponent(cityName)}`);
   };
 
-  const handleSelectCity = (cityName: string, displayName: string) => {
-    setNewCityDropdown(cityName);
-    setDropdownOpen(false);
-    router.push(`/?city=${encodeURIComponent(cityName)}`);
-  };
 
-  const estimateCost = async () => {
-    if (!newCityDropdown) return;
-    
-    setEstimating(true);
-    setCostEstimate(null);
-    
-    try {
-      const response = await fetch(`/api/count?city=${encodeURIComponent(newCityDropdown)}`);
-      if (!response.ok) throw new Error(`Error: ${response.status}`);
-      
-      const data = await response.json();
-      const estimatedCost = data.estimatedCost || 0;
-      
-      setCostEstimate(estimatedCost);
-    } catch (err: any) {
-      console.error('Failed to estimate cost:', err);
-      setCostEstimate(null);
-    } finally {
-      setEstimating(false);
-    }
-  };
 
-  const selectedCityConfig = SUPPORTED_CITIES.find(city => city.name === newCityDropdown);
-  
-  // Filter out cities that are already displayed as cards
-  const availableCities = SUPPORTED_CITIES.filter(cityConfig => 
-    !cities.some(card => card.name === cityConfig.name)
-  );
 
   if (selectedCity) {
     return (
@@ -156,7 +121,7 @@ export default function LandingPage() {
 
         {/* City cards container - this sets the width reference */}
         <div className={`grid grid-cols-1 gap-8 ${cities.length === 2 ? 'md:grid-cols-2 max-w-2xl mx-auto' : 'md:grid-cols-3'} mb-8`}>
-          {cities.map((city, index) => (
+          {cities.map((city) => (
             <div
               key={city.name}
               onClick={() => handleCityClick(city.name)}
@@ -169,7 +134,7 @@ export default function LandingPage() {
                   alt={city.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    e.currentTarget.src = `https://placehold.co/400x225/e2e8f0/64748b?text=${encodeURIComponent(city.name)}`;
+                    (e.target as HTMLImageElement).src = `https://placehold.co/400x225/e2e8f0/64748b?text=${encodeURIComponent(city.name)}`;
                   }}
                 />
               </div>

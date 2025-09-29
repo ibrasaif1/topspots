@@ -212,7 +212,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
 export default function RestaurantList({ city }: { city?: string }) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [hoveredRestaurant, setHoveredRestaurant] = useState<string | null>(null);
 
   useEffect(() => {
@@ -231,7 +231,7 @@ export default function RestaurantList({ city }: { city?: string }) {
             setRestaurants(data);
           } else if (data.places && Array.isArray(data.places)) {
             // Convert new format to old format for compatibility
-            const convertedRestaurants = data.places.map((place: any) => ({
+            const convertedRestaurants = data.places.map((place: Record<string, unknown>) => ({
               place_id: place.placeId || place.id,
               name: place.name,
               rating: place.rating || 0,
@@ -246,7 +246,7 @@ export default function RestaurantList({ city }: { city?: string }) {
             setRestaurants([]);
           }
         }
-      } catch (e: any) {
+      } catch {
         // If file doesn't exist, show empty restaurants but no error
         setRestaurants([]);
       } finally {
@@ -270,7 +270,6 @@ export default function RestaurantList({ city }: { city?: string }) {
     });
   }, [restaurants]);
   
-  const austinCenter: [number, number] = [30.2672, -97.7431];
 
   if (loading) return <div className="text-center text-neutral-600">Loading…</div>;
   if (error) return <div className="text-center text-red-600">{error}</div>;

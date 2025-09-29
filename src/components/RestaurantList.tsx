@@ -5,6 +5,10 @@ import { Wrapper } from "@googlemaps/react-wrapper";
 import { getCityByName } from "@/config/cities";
 
 // Declare google maps types for TypeScript
+interface GoogleMapsBounds {
+  extend: (position: { lat: number; lng: number }) => void;
+}
+
 declare global {
   interface Window {
     google: {
@@ -12,7 +16,7 @@ declare global {
         Map: new (element: HTMLElement, options: Record<string, unknown>) => unknown;
         Marker: new (options: Record<string, unknown>) => unknown;
         InfoWindow: new (options: Record<string, unknown>) => unknown;
-        LatLngBounds: new () => unknown;
+        LatLngBounds: new () => GoogleMapsBounds;
         Polygon: new (options: Record<string, unknown>) => unknown;
         Size: new (width: number, height: number) => unknown;
         Point: new (x: number, y: number) => unknown;
@@ -77,7 +81,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     mapInstanceRef.current = map;
 
     // Create bounds to fit all restaurants
-    const bounds = new google.maps.LatLngBounds() as any;
+    const bounds = new google.maps.LatLngBounds();
     let hasValidCoordinates = false;
 
     restaurants.forEach((restaurant) => {

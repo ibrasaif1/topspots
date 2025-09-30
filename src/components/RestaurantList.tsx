@@ -33,6 +33,7 @@ interface GoogleMapsMap {
   fitBounds: (bounds: unknown, padding?: Record<string, number>) => void;
   setCenter: (center: { lat: number; lng: number }) => void;
   setZoom: (zoom: number) => void;
+  addListener: (event: string, callback: () => void) => void;
 }
 
 interface GoogleMapsPolygon {
@@ -50,6 +51,15 @@ declare global {
         Size: new (width: number, height: number) => unknown;
         Point: new (x: number, y: number) => unknown;
         Animation: { BOUNCE: unknown };
+        OverlayView: new () => {
+          onAdd: () => void;
+          draw: () => void;
+          onRemove: () => void;
+          setMap: (map: unknown) => void;
+          getProjection: () => { fromLatLngToDivPixel: (latLng: unknown) => { x: number; y: number } | null } | null;
+          getPanes: () => { overlayMouseTarget: HTMLElement } | null;
+        };
+        LatLng: new (lat: number, lng: number) => unknown;
         marker: {
           AdvancedMarkerElement: new (options: Record<string, unknown>) => GoogleMapsAdvancedMarkerElement;
           PinElement: new (options?: Record<string, unknown>) => { element: HTMLElement };
@@ -167,68 +177,39 @@ const derivePriceRangeLabel = (priceRange: unknown): string => {
   return "";
 };
 
-const createCustomPopup = (restaurant: Restaurant, map: GoogleMapsMap, position: { lat: number; lng: number }) => {
-  const ratingLine = restaurant.rating
-    ? `⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews`
-    : "";
-
+const createCustomPopup = (restaurant: Restaurant) => {
   const priceRange = restaurant.priceRange ?? "";
-
   const detailParts: string[] = [];
   if (restaurant.cuisine) detailParts.push(escapeHtml(restaurant.cuisine));
   if (priceRange) detailParts.push(escapeHtml(priceRange));
 
-  const address = restaurant.address && /^https?:\/\//i.test(restaurant.address)
-    ? ""
-    : restaurant.address;
+  // Create Google Maps URL
+  const cleanPlaceId = restaurant.place_id.replace('places/', '');
+  const googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${cleanPlaceId}`;
 
   // Create custom popup div
   const popup = document.createElement('div');
   popup.style.cssText = `
-    position: absolute;
     background: white;
     border-radius: 12px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.15);
     padding: 16px;
-    max-width: 280px;
+    max-width: 260px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    z-index: 1000;
     border: 1px solid rgba(0,0,0,0.1);
-    transform: translate(-50%, -100%);
-    margin-top: -8px;
+    cursor: pointer;
+    position: relative;
   `;
 
   popup.innerHTML = `
-    <div style="position: relative;">
-      <button style="
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        background: #f3f4f6;
-        border: none;
-        border-radius: 50%;
-        width: 24px;
-        height: 24px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        color: #6b7280;
-        transition: all 0.2s;
-      " onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'" onclick="this.parentElement.parentElement.remove()">×</button>
-      
-      <div style="font-weight: 600; font-size: 16px; color: #111827; margin-bottom: 8px; line-height: 1.3; padding-right: 20px;">
-        ${escapeHtml(restaurant.name)}
-      </div>
-      
-      ${ratingLine ? `<div style="color: #059669; margin-bottom: 6px; font-size: 14px; font-weight: 500;">${ratingLine}</div>` : ""}
-      
-      ${detailParts.length ? `<div style="color: #6b7280; font-size: 13px; margin-bottom: 8px;">${detailParts.join(" · ")}</div>` : ""}
-      
-      ${address ? `<div style="color: #9ca3af; font-size: 12px; line-height: 1.4;">${escapeHtml(address)}</div>` : ""}
+    <div style="font-weight: 600; font-size: 15px; color: #111827; margin-bottom: 6px;">
+      ${escapeHtml(restaurant.name)}
     </div>
     
+    ${restaurant.rating ? `<div style="color: #059669; margin-bottom: 4px; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews</div>` : ""}
+    
+    ${detailParts.length ? `<div style="color: #6b7280; font-size: 12px;">${detailParts.join(" · ")}</div>` : ""}
+
     <!-- Arrow pointing down -->
     <div style="
       position: absolute;
@@ -255,6 +236,12 @@ const createCustomPopup = (restaurant: Restaurant, map: GoogleMapsMap, position:
     "></div>
   `;
 
+  // Make entire popup clickable to open Google Maps
+  popup.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.open(googleMapsUrl, '_blank');
+  });
+
   return popup;
 };
 
@@ -272,6 +259,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
   useEffect(() => {
     if (!mapRef.current || !window.google?.maps) return;
 
+
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: 30.2672, lng: -97.7431 },
       zoom: 12,
@@ -286,6 +274,13 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     });
 
     mapInstanceRef.current = map;
+
+    // Close InfoWindow when clicking on map
+    map.addListener('click', () => {
+      if (infoWindowRef.current) {
+        infoWindowRef.current.close();
+      }
+    });
 
     // Create bounds to fit all restaurants
     const bounds = new google.maps.LatLngBounds();
@@ -370,26 +365,36 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
           infoWindowRef.current.close();
         }
         
-        // For now, let's use a simple InfoWindow with better styling
+        // Create InfoWindow if it doesn't exist
         if (!infoWindowRef.current) {
           infoWindowRef.current = new google.maps.InfoWindow();
         }
         
+        const priceRange = restaurant.priceRange ?? "";
+        const detailParts: string[] = [];
+        if (restaurant.cuisine) detailParts.push(escapeHtml(restaurant.cuisine));
+        if (priceRange) detailParts.push(escapeHtml(priceRange));
+
+        // Create Google Maps URL
+        const cleanPlaceId = restaurant.place_id.replace('places/', '');
+        const googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${cleanPlaceId}`;
+
         const betterContent = `
           <div style="
             padding: 0;
             margin: 0;
             max-width: 260px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.4;
-          ">
-            <div style="font-weight: 600; font-size: 15px; color: #111827; margin-bottom: 6px; padding-right: 20px;">
+            line-height: 1.3;
+            cursor: pointer;
+          " onclick="window.open('${googleMapsUrl}', '_blank')">
+            <div style="font-weight: 600; font-size: 15px; color: #111827; margin: 0 0 6px 0;">
               ${escapeHtml(restaurant.name)}
             </div>
             
-            ${restaurant.rating ? `<div style="color: #059669; margin-bottom: 4px; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews</div>` : ""}
+            ${restaurant.rating ? `<div style="color: #059669; margin: 0 0 4px 0; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews</div>` : ""}
             
-            ${restaurant.cuisine ? `<div style="color: #6b7280; font-size: 12px;">${escapeHtml(restaurant.cuisine)}</div>` : ""}
+            ${detailParts.length ? `<div style="color: #6b7280; font-size: 12px; margin: 0;">${detailParts.join(" · ")}</div>` : ""}
           </div>
         `;
         

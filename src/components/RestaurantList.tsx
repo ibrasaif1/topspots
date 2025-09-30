@@ -9,9 +9,16 @@ interface GoogleMapsBounds {
   extend: (position: { lat: number; lng: number }) => void;
 }
 
-interface GoogleMapsMarker {
+interface GoogleMapsAdvancedMarkerElement {
   addListener: (event: string, callback: () => void) => void;
-  setAnimation: (animation: unknown) => void;
+  position: { lat: number; lng: number } | null;
+  content: HTMLElement | null;
+  map: unknown;
+  title: string;
+}
+
+interface GoogleMapsLegacyMarker {
+  addListener: (event: string, callback: () => void) => void;
   setIcon: (icon: Record<string, unknown>) => void;
   setMap: (map: unknown) => void;
 }
@@ -37,13 +44,16 @@ declare global {
     google: {
       maps: {
         Map: new (element: HTMLElement, options: Record<string, unknown>) => GoogleMapsMap;
-        Marker: new (options: Record<string, unknown>) => GoogleMapsMarker;
         InfoWindow: new (options?: Record<string, unknown>) => GoogleMapsInfoWindow;
         LatLngBounds: new () => GoogleMapsBounds;
         Polygon: new (options: Record<string, unknown>) => GoogleMapsPolygon;
         Size: new (width: number, height: number) => unknown;
         Point: new (x: number, y: number) => unknown;
         Animation: { BOUNCE: unknown };
+        marker: {
+          AdvancedMarkerElement: new (options: Record<string, unknown>) => GoogleMapsAdvancedMarkerElement;
+          PinElement: new (options?: Record<string, unknown>) => { element: HTMLElement };
+        };
       };
     };
   }
@@ -157,31 +167,95 @@ const derivePriceRangeLabel = (priceRange: unknown): string => {
   return "";
 };
 
-const formatInfoContent = (restaurant: Restaurant) => {
+const createCustomPopup = (restaurant: Restaurant, map: GoogleMapsMap, position: { lat: number; lng: number }) => {
   const ratingLine = restaurant.rating
     ? `⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews`
     : "";
 
-  const priceLevel = formatPriceLevel(restaurant.price);
   const priceRange = restaurant.priceRange ?? "";
 
   const detailParts: string[] = [];
   if (restaurant.cuisine) detailParts.push(escapeHtml(restaurant.cuisine));
-  if (priceLevel) detailParts.push(priceLevel);
   if (priceRange) detailParts.push(escapeHtml(priceRange));
 
   const address = restaurant.address && /^https?:\/\//i.test(restaurant.address)
     ? ""
     : restaurant.address;
 
-  return `
-    <div style="padding: 8px; max-width: 220px;">
-      <div style="font-weight: 600; font-size: 14px; color: #1f2937;">${escapeHtml(restaurant.name)}</div>
-      ${ratingLine ? `<div style="color: #6b7280; margin-top: 4px;">${ratingLine}</div>` : ""}
-      ${detailParts.length ? `<div style="color: #4b5563; font-size: 12px; margin-top: 6px;">${detailParts.join(" · ")}</div>` : ""}
-      ${address ? `<div style="color: #9ca3af; font-size: 12px; margin-top: 8px;">${escapeHtml(address)}</div>` : ""}
-    </div>
+  // Create custom popup div
+  const popup = document.createElement('div');
+  popup.style.cssText = `
+    position: absolute;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    padding: 16px;
+    max-width: 280px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    z-index: 1000;
+    border: 1px solid rgba(0,0,0,0.1);
+    transform: translate(-50%, -100%);
+    margin-top: -8px;
   `;
+
+  popup.innerHTML = `
+    <div style="position: relative;">
+      <button style="
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #f3f4f6;
+        border: none;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        color: #6b7280;
+        transition: all 0.2s;
+      " onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'" onclick="this.parentElement.parentElement.remove()">×</button>
+      
+      <div style="font-weight: 600; font-size: 16px; color: #111827; margin-bottom: 8px; line-height: 1.3; padding-right: 20px;">
+        ${escapeHtml(restaurant.name)}
+      </div>
+      
+      ${ratingLine ? `<div style="color: #059669; margin-bottom: 6px; font-size: 14px; font-weight: 500;">${ratingLine}</div>` : ""}
+      
+      ${detailParts.length ? `<div style="color: #6b7280; font-size: 13px; margin-bottom: 8px;">${detailParts.join(" · ")}</div>` : ""}
+      
+      ${address ? `<div style="color: #9ca3af; font-size: 12px; line-height: 1.4;">${escapeHtml(address)}</div>` : ""}
+    </div>
+    
+    <!-- Arrow pointing down -->
+    <div style="
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid white;
+    "></div>
+    <div style="
+      position: absolute;
+      bottom: -9px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-top: 9px solid rgba(0,0,0,0.1);
+      z-index: -1;
+    "></div>
+  `;
+
+  return popup;
 };
 
 function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: { 
@@ -192,34 +266,23 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMapsMap | null>(null);
-  const markersRef = useRef<{ [key: string]: GoogleMapsMarker }>({});
+  const markersRef = useRef<{ [key: string]: GoogleMapsAdvancedMarkerElement | GoogleMapsLegacyMarker }>({});
   const infoWindowRef = useRef<GoogleMapsInfoWindow | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !window.google?.maps) return;
 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: 30.2672, lng: -97.7431 },
       zoom: 12,
+      mapId: "2ddce5326308b2176661a3da", // Custom Map ID for Advanced Markers
       // Disable various controls
       streetViewControl: false,        // Removes Street View pegman
       fullscreenControl: false,        // Removes fullscreen button
       mapTypeControl: false,           // Removes Map/Satellite toggle
       zoomControl: true,               // Keep zoom controls
       gestureHandling: 'cooperative',  // Requires Ctrl+scroll to zoom
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }]
-        },
-        // Add more custom styling
-        {
-          featureType: "transit",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }]
-        }
-      ]
+      // Note: styles removed - when mapId is present, styles are controlled via Google Cloud Console
     });
 
     mapInstanceRef.current = map;
@@ -228,8 +291,6 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     const bounds = new google.maps.LatLngBounds();
     let hasValidCoordinates = false;
 
-    const infoWindow = new google.maps.InfoWindow();
-    infoWindowRef.current = infoWindow;
     let closeTimeout: number | null = null;
 
     restaurants.forEach((restaurant) => {
@@ -244,50 +305,119 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
       bounds.extend(position);
       hasValidCoordinates = true;
 
-      const marker = new google.maps.Marker({
-        position: position,
-        map: map,
-        title: restaurant.name,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(24, 24),
-          anchor: new google.maps.Point(12, 24)
-        }
-      });
+      let marker;
+      
+      try {
+        // Check if the new marker library is available and working
+        if (google.maps.marker?.PinElement && google.maps.marker?.AdvancedMarkerElement) {
+          const pin = new google.maps.marker.PinElement({
+            background: "#EF4444",
+            borderColor: "#DC2626",
+            glyphColor: "#FFFFFF",
+            scale: 1,
+          });
 
-      const openInfoWindow = () => {
+          marker = new google.maps.marker.AdvancedMarkerElement({
+            position: position,
+            map: map,
+            title: restaurant.name,
+            content: pin.element,
+          });
+        } else {
+          // Fallback to legacy Marker if AdvancedMarkerElement is not available
+          marker = new (google.maps as unknown as { Marker: new (options: Record<string, unknown>) => GoogleMapsLegacyMarker }).Marker({
+            position: position,
+            map: map,
+            title: restaurant.name,
+            icon: {
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(24, 24),
+              anchor: new google.maps.Point(12, 24)
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to create AdvancedMarkerElement, falling back to legacy Marker:', error);
+        // Force fallback to legacy marker
+        marker = new (google.maps as unknown as { Marker: new (options: Record<string, unknown>) => GoogleMapsLegacyMarker }).Marker({
+          position: position,
+          map: map,
+          title: restaurant.name,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
+              </svg>
+            `),
+            scaledSize: new google.maps.Size(24, 24),
+            anchor: new google.maps.Point(12, 24)
+          }
+        });
+      }
+
+      const showCustomPopup = () => {
         if (closeTimeout) {
           window.clearTimeout(closeTimeout);
           closeTimeout = null;
         }
-        const content = formatInfoContent(restaurant);
-        infoWindow.setContent(content);
-        infoWindow.open(map, marker);
+        
+        // Close existing InfoWindow
+        if (infoWindowRef.current) {
+          infoWindowRef.current.close();
+        }
+        
+        // For now, let's use a simple InfoWindow with better styling
+        if (!infoWindowRef.current) {
+          infoWindowRef.current = new google.maps.InfoWindow();
+        }
+        
+        const betterContent = `
+          <div style="
+            padding: 0;
+            margin: 0;
+            max-width: 260px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.4;
+          ">
+            <div style="font-weight: 600; font-size: 15px; color: #111827; margin-bottom: 6px; padding-right: 20px;">
+              ${escapeHtml(restaurant.name)}
+            </div>
+            
+            ${restaurant.rating ? `<div style="color: #059669; margin-bottom: 4px; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews</div>` : ""}
+            
+            ${restaurant.cuisine ? `<div style="color: #6b7280; font-size: 12px;">${escapeHtml(restaurant.cuisine)}</div>` : ""}
+          </div>
+        `;
+        
+        infoWindowRef.current.setContent(betterContent);
+        infoWindowRef.current.open(map, marker);
       };
 
-      const scheduleCloseInfoWindow = () => {
+      const scheduleClosePopup = () => {
         closeTimeout = window.setTimeout(() => {
-          infoWindow.close();
+          if (infoWindowRef.current) {
+            infoWindowRef.current.close();
+          }
           closeTimeout = null;
         }, 150);
       };
 
       marker.addListener('click', () => {
-        openInfoWindow();
+        showCustomPopup();
       });
 
       marker.addListener('mouseover', () => {
         onMarkerHover(restaurant.place_id);
-        openInfoWindow();
+        showCustomPopup();
       });
 
       marker.addListener('mouseout', () => {
         onMarkerHover(null);
-        scheduleCloseInfoWindow();
+        scheduleClosePopup();
       });
 
       markersRef.current[restaurant.place_id] = marker;
@@ -336,7 +466,13 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
         window.clearTimeout(closeTimeout);
         closeTimeout = null;
       }
-      Object.values(markersRef.current).forEach(marker => marker.setMap(null));
+      Object.values(markersRef.current).forEach(marker => {
+        if ('map' in marker && marker.map !== undefined) {
+          (marker as GoogleMapsAdvancedMarkerElement).map = null; // AdvancedMarkerElement
+        } else if ('setMap' in marker) {
+          (marker as GoogleMapsLegacyMarker).setMap(null); // Legacy Marker
+        }
+      });
       markersRef.current = {};
       if (infoWindowRef.current) {
         infoWindowRef.current.close();
@@ -350,34 +486,54 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
     Object.entries(markersRef.current).forEach(([placeId, marker]) => {
       const isHovered = hoveredRestaurant === placeId;
       
-      if (isHovered) {
-        // Make marker bounce
-        marker.setAnimation(google.maps.Animation.BOUNCE);
-        
-        // Change to highlighted icon
-        marker.setIcon({
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3B82F6"/>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 32)
-        });
-      } else {
-        // Stop bouncing
-        marker.setAnimation(null);
-        
-        // Restore normal icon
-        marker.setIcon({
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(24, 24),
-          anchor: new google.maps.Point(12, 24)
-        });
+      try {
+        // Check if this is an AdvancedMarkerElement
+        if ('content' in marker && google.maps.marker?.PinElement) {
+          if (isHovered) {
+            // Create highlighted pin
+            const highlightedPin = new google.maps.marker.PinElement({
+              background: "#3B82F6",
+              borderColor: "#2563EB",
+              glyphColor: "#FFFFFF",
+              scale: 1.3,
+            });
+            (marker as GoogleMapsAdvancedMarkerElement).content = highlightedPin.element;
+          } else {
+            // Restore normal pin
+            const normalPin = new google.maps.marker.PinElement({
+              background: "#EF4444",
+              borderColor: "#DC2626",
+              glyphColor: "#FFFFFF",
+              scale: 1,
+            });
+            (marker as GoogleMapsAdvancedMarkerElement).content = normalPin.element;
+          }
+        } else if ('setIcon' in marker) {
+          // Legacy Marker fallback
+          if (isHovered) {
+            (marker as GoogleMapsLegacyMarker).setIcon({
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3B82F6"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(32, 32),
+              anchor: new google.maps.Point(16, 32)
+            });
+          } else {
+            (marker as GoogleMapsLegacyMarker).setIcon({
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(24, 24),
+              anchor: new google.maps.Point(12, 24)
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to update marker highlight:', error);
       }
     });
   }, [hoveredRestaurant]);
@@ -458,7 +614,7 @@ export default function RestaurantList({ city }: { city?: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Google Map */}
         <div className="lg:sticky lg:top-24 h-[700px] bg-white rounded-lg border border-neutral-200 overflow-hidden">
-          <Wrapper apiKey={process.env.NEXT_PUBLIC_FRONTEND_API_KEY || ""} render={() => <div />}>
+          <Wrapper apiKey={process.env.NODE_ENV === 'production' ? process.env.NEXT_PUBLIC_FRONTEND_API_KEY || "" : process.env.DEV_KEY || ""} libraries={["marker"]} render={() => <div />}>
             <GoogleMap 
               restaurants={items}
               hoveredRestaurant={hoveredRestaurant}

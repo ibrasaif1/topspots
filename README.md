@@ -1,22 +1,21 @@
-### Backend Search
-- Aggregate API INSIGHT_COUNT city_polygon -> how many 4.5s to search through to find >1000 ratings
-- Aggregate API INSIGHT_PLACES city_polygon -> place ID list of length from INSIGHT_COUNT
-- Place Details API -> Populates all desired fields per place ID
-- locationFilter needs to be polygon
-    - circle is harder to divide and region (by inputting place ID for city) isn't quantitative so can't divide
-        - they need to divide b/c 
+## Tasks:
+- Flesh out backend fully
+- Start implementing
 
-### Urgent Tasks
-- Implement other cities gated by hardcoding for data retrieval
-    - We can locally store json per city for now
-- Get businessType for future feature of coffee (**what other types of businesses are there?**)
+## Backend / API Requests:
+- INSIGHT_COUNT
+    - After a user selects their area and triggers this, return how many places are 4.5+ and correlating cost (*$0.02)
+    - The next INSIGHT_PLACES call needs to be on the exact same area as this one
+    - We need to subtract the amount currently in the area for the cost of new places
+    - The area filter must be **polygon** since circle is hard to divide
+- INSIGHT_PLACES
+    - After user confirms cost of search, this gets ran with Place Details below to get the places and their data
+    - This one is capped at 100 so we figure out our subdivisions by splitting while COUNT >= 100
+    - **How can we make this concurrent with Place Details for best speed?** 
+        - Once we have a valid subdivision and can call PLACES, start adding those places to a queue and while len(queue) > 0, call Place Details and add to storage and remove ID from queue AFTER we store the Place ID with its details
+            - *We should have a test file for this*
+- Place Details
 
-### Future Tasks
-- Toggle sort by ratingCount or rating or combo
-- Coffee sort
-    - I can add a businessType to my local json for this
-- Smart splitting (for the 100 limit, if we have say 900 a 9 split factor is better than if we have 400 and want 4)
-- Geocoding API can take Place ID and give us lat/lon for map view. We get 10,000 free calls a month
-
-### Lessons
-- Coming up with Future Tasks to know if my system design is good
+## Backlog
+- Lists to store Been, Favorite
+- Add filters: price levels, higher stars, higher ratings

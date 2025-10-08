@@ -4,6 +4,8 @@ import React, { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import RestaurantList from "../components/RestaurantList";
+import CityCard from "../components/CityCard";
+import AddCityCard from "../components/AddCityCard";
 import { getCityByName } from "@/config/cities";
 
 const cities = [
@@ -19,36 +21,6 @@ const cities = [
   }
 ];
 
-function CityRestaurantCount({ cityName }: { cityName: string }) {
-  const [count, setCount] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const cityConfig = getCityByName(cityName);
-    
-    if (cityConfig?.highRatedCount) {
-      // Use hardcoded count if available
-      setCount(cityConfig.highRatedCount);
-    } else {
-      // Call API to get count
-      setLoading(true);
-      fetch(`/api/count?city=${encodeURIComponent(cityName)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.ok) {
-            setCount(data.restaurantCount);
-          }
-        })
-        .catch(err => console.error('Error fetching count:', err))
-        .finally(() => setLoading(false));
-    }
-  }, [cityName]);
-
-  if (loading) return <span className="text-sm text-gray-500">Loading count...</span>;
-  if (count === null) return null;
-  
-  return <span className="text-sm text-gray-500">{count.toLocaleString()} restaurants (4.5+ stars)</span>;
-}
 
 function LandingPageContent() {
   const searchParams = useSearchParams();
@@ -60,14 +32,18 @@ function LandingPageContent() {
     router.push(`/?city=${encodeURIComponent(cityName)}`);
   };
 
+  const handleAddCityClick = () => {
+    router.push('/add-city');
+  };
+
 
 
 
   if (selectedCity) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-blue-100">
-          <div className="mx-auto max-w-7xl px-4 py-4">
+      <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">
+        <header className="flex-shrink-0 z-20 bg-white/80 backdrop-blur border-b border-blue-100">
+          <div className="px-4 py-4">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">TopSpots</h1>
               <h2 className="text-lg text-gray-600">{selectedCity}</h2>
@@ -75,7 +51,7 @@ function LandingPageContent() {
           </div>
         </header>
 
-        <section className="mx-auto max-w-7xl px-4 py-8">
+        <section className="flex-1 overflow-hidden px-4 py-4">
           <RestaurantList city={selectedCity} />
         </section>
       </div>
@@ -103,59 +79,17 @@ function LandingPageContent() {
           Discover the highest-rated restaurants in your city, exclusively featuring establishments with 4.5+ stars and 1,000+ verified Google reviews
         </motion.p>
 
-        {/* City cards container - this sets the width reference */}
-        <div className={`grid grid-cols-1 gap-8 ${cities.length === 2 ? 'md:grid-cols-2 max-w-2xl mx-auto' : 'md:grid-cols-3'} mb-8`}>
+        <div className={`grid grid-cols-1 gap-8 ${cities.length >= 2 ? 'md:grid-cols-2 lg:grid-cols-3 max-w-4xl mx-auto' : 'md:grid-cols-3'} mb-8`}>
           {cities.map((city) => (
-            <div
+            <CityCard
               key={city.name}
-              onClick={() => handleCityClick(city.name)}
-              className="bg-white rounded-3xl shadow-xl hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-95 active:scale-90 border border-blue-100"
-            >
-              
-              <div className="aspect-video rounded-t-3xl overflow-hidden bg-gray-200">
-                <img
-                  src={city.image}
-                  alt={city.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://placehold.co/400x225/e2e8f0/64748b?text=${encodeURIComponent(city.name)}`;
-                  }}
-                />
-              </div>
-              
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">{city.name}</h2>
-              </div>
-            </div>
+              name={city.name}
+              image={city.image}
+              onClick={handleCityClick}
+            />
           ))}
+          <AddCityCard onClick={handleAddCityClick} />
         </div>
-
-        {/* Dropdown container - disabled */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className={`${cities.length === 2 ? 'max-w-2xl' : 'max-w-4xl'} mx-auto`}
-        >
-          <div className="relative">
-            <button
-              disabled
-              className="px-6 py-3 bg-gray-100 text-gray-400 rounded-2xl w-full flex items-center justify-between border border-gray-200 cursor-not-allowed opacity-60"
-            >
-              <span className="font-medium">
-                Add new city...
-              </span>
-              <svg
-                className="w-5 h-5 ml-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-        </motion.div>
       </div>
     </div>
   );

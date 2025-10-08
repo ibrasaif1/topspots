@@ -33,7 +33,7 @@ interface GoogleMapsMap {
   fitBounds: (bounds: unknown, padding?: Record<string, number>) => void;
   setCenter: (center: { lat: number; lng: number }) => void;
   setZoom: (zoom: number) => void;
-  addListener: (event: string, callback: () => void) => void;
+  addListener: (event: string, callback: (...args: any[]) => void) => void;
 }
 
 interface GoogleMapsPolygon {
@@ -367,7 +367,9 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
         
         // Create InfoWindow if it doesn't exist
         if (!infoWindowRef.current) {
-          infoWindowRef.current = new google.maps.InfoWindow();
+          infoWindowRef.current = new google.maps.InfoWindow({
+            zIndex: 2000 // Ensure popup is always above markers
+          });
         }
         
         const priceRange = restaurant.priceRange ?? "";
@@ -503,6 +505,8 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
               scale: 1.3,
             });
             (marker as GoogleMapsAdvancedMarkerElement).content = highlightedPin.element;
+            // Bring marker to front
+            (marker as any).zIndex = 1000;
           } else {
             // Restore normal pin
             const normalPin = new google.maps.marker.PinElement({
@@ -512,6 +516,8 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
               scale: 1,
             });
             (marker as GoogleMapsAdvancedMarkerElement).content = normalPin.element;
+            // Reset z-index
+            (marker as any).zIndex = 1;
           }
         } else if ('setIcon' in marker) {
           // Legacy Marker fallback
@@ -523,7 +529,8 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
                 </svg>
               `),
               scaledSize: new google.maps.Size(32, 32),
-              anchor: new google.maps.Point(16, 32)
+              anchor: new google.maps.Point(16, 32),
+              zIndex: 1000
             });
           } else {
             (marker as GoogleMapsLegacyMarker).setIcon({
@@ -533,7 +540,8 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
                 </svg>
               `),
               scaledSize: new google.maps.Size(24, 24),
-              anchor: new google.maps.Point(12, 24)
+              anchor: new google.maps.Point(12, 24),
+              zIndex: 1
             });
           }
         }
@@ -613,14 +621,19 @@ export default function RestaurantList({ city }: { city?: string }) {
   if (error) return <div className="text-center text-red-600">{error}</div>;
 
   return (
-    <section className="mx-auto max-w-7xl">
-      <div className="mb-3 text-sm text-neutral-600">Showing {items.length.toLocaleString()} places</div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <section className="h-full w-full">
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
         {/* Google Map */}
-        <div className="lg:sticky lg:top-24 h-[700px] bg-white rounded-lg border border-neutral-200 overflow-hidden">
-          <Wrapper apiKey={process.env.NODE_ENV === 'production' ? process.env.NEXT_PUBLIC_FRONTEND_API_KEY || "" : process.env.DEV_KEY || ""} libraries={["marker"]} render={() => <div />}>
-            <GoogleMap 
+        <div className="h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
+          <Wrapper
+            apiKey={process.env.NODE_ENV === "production"
+              ? process.env.NEXT_PUBLIC_FRONTEND_API_KEY || ""
+              : process.env.NEXT_PUBLIC_DEV_KEY || process.env.NEXT_PUBLIC_FRONTEND_API_KEY || ""}
+            libraries={["marker"]}
+            render={() => <div />}
+          >
+            <GoogleMap
               restaurants={items}
               hoveredRestaurant={hoveredRestaurant}
               onMarkerHover={setHoveredRestaurant}
@@ -630,7 +643,7 @@ export default function RestaurantList({ city }: { city?: string }) {
         </div>
 
         {/* Restaurant List */}
-        <div className="lg:sticky lg:top-24 h-[700px] bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <div className="h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
           <div className="h-full overflow-y-auto p-4">
             <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
               {items.map((r) => {
@@ -640,8 +653,8 @@ export default function RestaurantList({ city }: { city?: string }) {
                     key={r.place_id}
                     className={
                       "group relative rounded-lg border overflow-hidden cursor-pointer flex flex-col transition-all duration-200 ease-out " +
-                      (isHovered 
-                        ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200" 
+                      (isHovered
+                        ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200"
                         : "bg-white border-neutral-200 hover:border-blue-300 hover:shadow-md hover:ring-1 hover:ring-blue-200")
                     }
                     onMouseEnter={() => setHoveredRestaurant(r.place_id)}
@@ -662,7 +675,7 @@ export default function RestaurantList({ city }: { city?: string }) {
                       <div className="text-xs text-gray-600 truncate mb-2" title={r.cuisine || "Restaurant"}>
                         {r.cuisine || "Restaurant"}
                       </div>
-                      
+
                       <div className="flex justify-between items-end">
                         <div className="text-sm text-gray-900 leading-tight tabular-nums font-medium">
                           ⭐ {r.rating?.toFixed(1) ?? "-"}

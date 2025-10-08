@@ -1,49 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCityByName } from '@/config/cities';
 import { PLACE_TYPES } from '@/config/filters';
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const city = searchParams.get('city');
-
-  if (!city) {
-    return NextResponse.json({ error: 'Missing city parameter' }, { status: 400 });
-  }
-
+export async function POST(request: NextRequest) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'Google API key not configured' }, { status: 500 });
   }
 
   try {
-    console.log(`Getting restaurant count for ${city}...`);
+    const body = await request.json();
+    const { polygon } = body;
 
-    // Get city configuration from our predefined list
-    const cityConfig = getCityByName(city);
-    if (!cityConfig) {
-      throw new Error(`City not supported: ${city}. Please select from available cities.`);
+    if (!polygon || !Array.isArray(polygon) || polygon.length !== 5) {
+      return NextResponse.json({
+        error: 'Invalid polygon. Must provide 5 coordinates (4 points + closing point)'
+      }, { status: 400 });
     }
 
-    console.log(`Using predefined polygon for ${cityConfig.displayName}`);
-    console.log(`Polygon coordinates:`, cityConfig.polygon);
+    console.log(`Getting restaurant count for custom polygon...`);
+    console.log(`Polygon coordinates:`, polygon);
 
-    // Get restaurant count from Google Area Insights API using polygon
-    // Close the polygon by adding first coordinate as last
-    const coordinates = cityConfig.polygon.map(coord => ({
-      latitude: coord.latitude,
-      longitude: coord.longitude
-    }));
-    coordinates.push(coordinates[0]); // Close the polygon
-    
-    const body = {
+    const requestBody = {
       insights: ['INSIGHT_COUNT'],
       filter: {
         locationFilter: {
           customArea: {
             polygon: {
-              coordinates: coordinates
+              coordinates: polygon
             }
-            
           }
         },
         typeFilter: { includedTypes: PLACE_TYPES },
@@ -52,7 +36,7 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    console.log(`Making count API call for ${cityConfig.displayName} using polygon filter`);
+    console.log(`Making count API call using custom polygon filter`);
 
     const googleResponse = await fetch('https://areainsights.googleapis.com/v1:computeInsights', {
       method: 'POST',
@@ -60,7 +44,7 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(requestBody)
     });
 
     if (!googleResponse.ok) {
@@ -76,7 +60,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      city: cityConfig.displayName,
       restaurantCount: count,
       estimatedCost: cost
     });

@@ -7,21 +7,15 @@ import { Wrapper } from '@googlemaps/react-wrapper'
 interface GoogleMapsMap {
   setCenter: (center: { lat: number; lng: number }) => void
   setZoom: (zoom: number) => void
-  addListener: (event: string, callback: (...args: any[]) => void) => void
+  addListener: (event: string, callback: (...args: unknown[]) => void) => void
   getCenter?: () => { lat: () => number; lng: () => number }
   getZoom?: () => number
-  fitBounds?: (bounds: any, padding?: any) => void
+  fitBounds?: (bounds: unknown, padding?: unknown) => void
 }
 
 interface GoogleMapsMarker {
   setMap: (map: GoogleMapsMap | null) => void
   setPosition: (position: { lat: number; lng: number }) => void
-}
-
-interface GoogleMapsCircle {
-  setMap: (map: GoogleMapsMap | null) => void
-  setCenter: (center: { lat: number; lng: number }) => void
-  setRadius: (radius: number) => void
 }
 
 interface GoogleMapsPolygon {
@@ -30,11 +24,8 @@ interface GoogleMapsPolygon {
 }
 
 interface GoogleMapsEmbedProps {
-  query?: string
   location?: string
-  radius?: number
   onCoordinatesChange?: (coords: {lat: number, lng: number}) => void
-  onRadiusChange?: (radius: number) => void
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
   clearPolygon?: boolean
   onPolygonCleared?: () => void
@@ -44,28 +35,22 @@ interface GoogleMapsEmbedProps {
 
 function GoogleMapComponent({
   location,
-  radius,
   onCoordinatesChange,
-  onRadiusChange,
   onPolygonChange,
   clearPolygon,
   onPolygonCleared,
   isLocked,
   showExistingPins,
   currentZoom,
-  setCurrentZoom
 }: {
   location?: string
-  radius: number
   onCoordinatesChange?: (coords: {lat: number, lng: number}) => void
-  onRadiusChange?: (radius: number) => void
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
   clearPolygon?: boolean
   onPolygonCleared?: () => void
   isLocked?: boolean
   showExistingPins?: boolean
   currentZoom: number
-  setCurrentZoom: (zoom: number) => void
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<GoogleMapsMap | null>(null)
@@ -112,7 +97,11 @@ function GoogleMapComponent({
       try {
         // Load all restaurant data files
         const cities = ['austin', 'san_diego']
-        const allRestaurants: any[] = []
+        const allRestaurants: Array<{
+          place_id?: string;
+          name?: string;
+          gps_coordinates?: { latitude: number; longitude: number };
+        }> = []
 
         for (const city of cities) {
           try {
@@ -122,7 +111,7 @@ function GoogleMapComponent({
               if (Array.isArray(data)) {
                 allRestaurants.push(...data)
               } else if (data.places && Array.isArray(data.places)) {
-                allRestaurants.push(...data.places.map((place: any) => ({
+                allRestaurants.push(...data.places.map((place: { placeId?: string; id?: string; name?: string; location?: { latitude: number; longitude: number } }) => ({
                   place_id: place.placeId || place.id,
                   name: place.name,
                   gps_coordinates: place.location || { latitude: 0, longitude: 0 }
@@ -142,7 +131,7 @@ function GoogleMapComponent({
         allRestaurants.forEach((restaurant) => {
           if (!restaurant.gps_coordinates?.latitude || !restaurant.gps_coordinates?.longitude) return
 
-          const marker = new (window.google.maps as any).Marker({
+          const marker = new (window.google.maps as unknown as { Marker: new (options: Record<string, unknown>) => GoogleMapsMarker }).Marker({
             position: {
               lat: restaurant.gps_coordinates.latitude,
               lng: restaurant.gps_coordinates.longitude
@@ -191,14 +180,15 @@ function GoogleMapComponent({
     mapInstanceRef.current = map
 
     // Handle map clicks to add polygon points
-    map.addListener('click', (e: any) => {
+    map.addListener('click', (...args: unknown[]) => {
       // Don't allow clicks if locked
       if (isLocked) {
         return
       }
 
-      const clickedLat = e.latLng.lat()
-      const clickedLng = e.latLng.lng()
+      const e = args[0] as { latLng?: { lat: () => number; lng: () => number } }
+      const clickedLat = e.latLng?.lat() ?? 0
+      const clickedLng = e.latLng?.lng() ?? 0
       const newPoint = { lat: clickedLat, lng: clickedLng }
 
       setPolygonPoints(prev => {
@@ -210,7 +200,7 @@ function GoogleMapComponent({
         const updated = [...prev, newPoint]
 
         // Create marker for this point
-        const marker = new (window.google.maps as any).Marker({
+        const marker = new (window.google.maps as unknown as { Marker: new (options: Record<string, unknown>) => GoogleMapsMarker }).Marker({
           position: newPoint,
           map: map,
           label: {
@@ -339,18 +329,15 @@ function GoogleMapComponent({
 }
 
 export default function GoogleMapsEmbed({
-  query = "restaurants near me",
   location = "New York, NY",
-  radius = 5000,
   onCoordinatesChange,
-  onRadiusChange,
   onPolygonChange,
   clearPolygon,
   onPolygonCleared,
   isLocked,
   showExistingPins
 }: GoogleMapsEmbedProps) {
-  const [currentZoom, setCurrentZoom] = useState(12)
+  const [currentZoom] = useState(12)
 
   return (
     <Wrapper
@@ -362,16 +349,13 @@ export default function GoogleMapsEmbed({
     >
       <GoogleMapComponent
         location={location}
-        radius={radius}
         onCoordinatesChange={onCoordinatesChange}
-        onRadiusChange={onRadiusChange}
         onPolygonChange={onPolygonChange}
         clearPolygon={clearPolygon}
         onPolygonCleared={onPolygonCleared}
         isLocked={isLocked}
         showExistingPins={showExistingPins}
         currentZoom={currentZoom}
-        setCurrentZoom={setCurrentZoom}
       />
     </Wrapper>
   )

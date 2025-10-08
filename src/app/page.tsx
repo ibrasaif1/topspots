@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { Suspense } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import RestaurantList from "../components/RestaurantList";
 import CityCard from "../components/CityCard";
 import AddCityCard from "../components/AddCityCard";
-import { getCityByName } from "@/config/cities";
 
 const cities = [
   {

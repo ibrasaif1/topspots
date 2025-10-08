@@ -30,10 +30,10 @@ interface GoogleMapsInfoWindow {
 }
 
 interface GoogleMapsMap {
-  fitBounds: (bounds: unknown, padding?: Record<string, number>) => void;
+  fitBounds: (bounds: unknown, padding?: unknown) => void;
   setCenter: (center: { lat: number; lng: number }) => void;
   setZoom: (zoom: number) => void;
-  addListener: (event: string, callback: (...args: any[]) => void) => void;
+  addListener: (event: string, callback: (...args: unknown[]) => void) => void;
 }
 
 interface GoogleMapsPolygon {
@@ -102,32 +102,6 @@ const escapeHtml = (value: string) =>
     }
   });
 
-const formatPriceLevel = (price?: string) => {
-  if (!price) return "";
-
-  const normalized = price.toUpperCase();
-  const priceMap: Record<string, string> = {
-    PRICE_LEVEL_INEXPENSIVE: "$",
-    PRICE_LEVEL_MODERATE: "$$",
-    PRICE_LEVEL_EXPENSIVE: "$$$",
-    PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
-    PRICE_LEVEL_ONE: "$",
-    PRICE_LEVEL_TWO: "$$",
-    PRICE_LEVEL_THREE: "$$$",
-    PRICE_LEVEL_FOUR: "$$$$"
-  };
-
-  if (priceMap[normalized]) {
-    return priceMap[normalized];
-  }
-
-  if (/^\$+/.test(price)) {
-    return price;
-  }
-
-  return price;
-};
-
 type RawPriceAmount = {
   currencyCode?: string;
   units?: string | number;
@@ -175,74 +149,6 @@ const derivePriceRangeLabel = (priceRange: unknown): string => {
   if (start) return `${start}+`;
   if (end) return `Up to ${end}`;
   return "";
-};
-
-const createCustomPopup = (restaurant: Restaurant) => {
-  const priceRange = restaurant.priceRange ?? "";
-  const detailParts: string[] = [];
-  if (restaurant.cuisine) detailParts.push(escapeHtml(restaurant.cuisine));
-  if (priceRange) detailParts.push(escapeHtml(priceRange));
-
-  // Create Google Maps URL
-  const cleanPlaceId = restaurant.place_id.replace('places/', '');
-  const googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${cleanPlaceId}`;
-
-  // Create custom popup div
-  const popup = document.createElement('div');
-  popup.style.cssText = `
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    padding: 16px;
-    max-width: 260px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    border: 1px solid rgba(0,0,0,0.1);
-    cursor: pointer;
-    position: relative;
-  `;
-
-  popup.innerHTML = `
-    <div style="font-weight: 600; font-size: 15px; color: #111827; margin-bottom: 6px;">
-      ${escapeHtml(restaurant.name)}
-    </div>
-    
-    ${restaurant.rating ? `<div style="color: #059669; margin-bottom: 4px; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews</div>` : ""}
-    
-    ${detailParts.length ? `<div style="color: #6b7280; font-size: 12px;">${detailParts.join(" · ")}</div>` : ""}
-
-    <!-- Arrow pointing down -->
-    <div style="
-      position: absolute;
-      bottom: -8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 8px solid white;
-    "></div>
-    <div style="
-      position: absolute;
-      bottom: -9px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 9px solid transparent;
-      border-right: 9px solid transparent;
-      border-top: 9px solid rgba(0,0,0,0.1);
-      z-index: -1;
-    "></div>
-  `;
-
-  // Make entire popup clickable to open Google Maps
-  popup.addEventListener('click', (e) => {
-    e.stopPropagation();
-    window.open(googleMapsUrl, '_blank');
-  });
-
-  return popup;
 };
 
 function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: { 
@@ -506,7 +412,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
             });
             (marker as GoogleMapsAdvancedMarkerElement).content = highlightedPin.element;
             // Bring marker to front
-            (marker as any).zIndex = 1000;
+            (marker as GoogleMapsAdvancedMarkerElement & { zIndex: number }).zIndex = 1000;
           } else {
             // Restore normal pin
             const normalPin = new google.maps.marker.PinElement({
@@ -517,7 +423,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
             });
             (marker as GoogleMapsAdvancedMarkerElement).content = normalPin.element;
             // Reset z-index
-            (marker as any).zIndex = 1;
+            (marker as GoogleMapsAdvancedMarkerElement & { zIndex: number }).zIndex = 1;
           }
         } else if ('setIcon' in marker) {
           // Legacy Marker fallback

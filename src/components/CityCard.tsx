@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { getCityByName } from "@/config/cities";
 
 interface CityCardProps {
@@ -39,22 +40,23 @@ function CityRestaurantCount({ cityName }: { cityName: string }) {
 }
 
 export default function CityCard({ name, image, onClick }: CityCardProps) {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <div
       onClick={() => onClick(name)}
       className="bg-white rounded-3xl shadow-xl hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-95 active:scale-90 border border-blue-100"
     >
-      <div className="aspect-video rounded-t-3xl overflow-hidden bg-gray-200">
-        <img
-          src={image}
+      <div className="aspect-video rounded-t-3xl overflow-hidden bg-gray-200 relative">
+        <Image
+          src={imageError ? `https://placehold.co/400x225/e2e8f0/64748b?text=${encodeURIComponent(name)}` : image}
           alt={name}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://placehold.co/400x225/e2e8f0/64748b?text=${encodeURIComponent(name)}`;
-          }}
+          fill
+          className="object-cover"
+          onError={() => setImageError(true)}
         />
       </div>
-      
+
       <div className="p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">{name}</h2>
         <CityRestaurantCount cityName={name} />

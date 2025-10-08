@@ -9,16 +9,25 @@ export default function AddCityPage() {
   const router = useRouter();
   const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
-  const [costData, setCostData] = useState<{
-    count: number;
-    cost: number;
-  } | null>(null);
   const [polygon, setPolygon] = useState<{lat: number, lng: number}[]>([]);
-  const [apiPayload, setApiPayload] = useState<any>(null);
+  const [apiPayload, setApiPayload] = useState<{
+    insights: string[];
+    filter: {
+      locationFilter: {
+        customArea: {
+          polygon: {
+            coordinates: { latitude: number; longitude: number }[];
+          };
+        };
+      };
+      typeFilter: { includedTypes: string[] };
+      ratingFilter: { minRating: number; maxRating: number };
+      operatingStatus: string[];
+    };
+  } | null>(null);
   const [clearPolygon, setClearPolygon] = useState(false);
   const [isPolygonLocked, setIsPolygonLocked] = useState(false);
   const [countResults, setCountResults] = useState<{count: number, cost: number} | null>(null);
-  const [lockedPolygon, setLockedPolygon] = useState<{lat: number, lng: number}[]>([]);
 
   // Feature flag: true = dev mode (mock data), false = paid mode (real API)
   const isDevMode = process.env.NEXT_PUBLIC_APP_ENV !== 'production';
@@ -84,7 +93,6 @@ export default function AddCityPage() {
       if (data.ok) {
         // Lock the polygon and save results
         setIsPolygonLocked(true);
-        setLockedPolygon([...polygon]);
         setCountResults({
           count: data.restaurantCount,
           cost: data.estimatedCost
@@ -113,7 +121,6 @@ export default function AddCityPage() {
   const handleResetArea = () => {
     // Unlock and clear everything
     setIsPolygonLocked(false);
-    setLockedPolygon([]);
     setCountResults(null);
     setApiPayload(null);
     setClearPolygon(true);
@@ -277,18 +284,6 @@ export default function AddCityPage() {
                   <pre className="bg-purple-100 p-3 rounded-lg text-xs overflow-x-auto text-purple-800">
 {JSON.stringify(apiPayload, null, 2)}
                   </pre>
-                </div>
-              )}
-
-              {costData && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                  <h4 className="font-semibold text-green-800 mb-2">Cost Calculation Results</h4>
-                  <p className="text-green-700">
-                    Found <strong>{costData.count.toLocaleString()}</strong> restaurants (4.5+ stars)
-                  </p>
-                  <p className="text-green-700">
-                    Estimated cost: <strong>${costData.cost.toFixed(2)}</strong>
-                  </p>
                 </div>
               )}
 

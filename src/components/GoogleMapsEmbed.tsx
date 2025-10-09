@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Wrapper } from '@googlemaps/react-wrapper'
 
 interface GoogleMapsEmbedProps {
@@ -47,21 +47,24 @@ function GoogleMapComponent({
   }>
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapInstanceRef = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const restaurantMarkersRef = useRef<any[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const polygonRef = useRef<any>(null)
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<{lat: number, lng: number}[]>([])
-  const [loading, setLoading] = useState(false)
 
   // Geocode location when it changes
   useEffect(() => {
     if (!location) return
 
     const geocodeLocation = async () => {
-      setLoading(true)
       try {
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
@@ -74,16 +77,26 @@ function GoogleMapComponent({
         }
       } catch (error) {
         console.error('Geocoding error:', error)
-      } finally {
-        setLoading(false)
       }
     }
 
     geocodeLocation()
   }, [location])
 
+  // Create marker HTML element
+  const createMarkerElement = useCallback((number: number) => {
+    const div = document.createElement('div')
+    div.innerHTML = `
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="12" fill="${isLocked ? '#10b981' : '#EF4444'}" stroke="white" stroke-width="3"/>
+        <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${number}</text>
+      </svg>
+    `
+    return div
+  }, [isLocked])
+
   // Rebuild markers with correct numbering
-  const rebuildMarkers = (points: {lat: number, lng: number}[]) => {
+  const rebuildMarkers = useCallback((points: {lat: number, lng: number}[]) => {
     if (!mapInstanceRef.current || !window.google?.maps) return
 
     // Clear old markers
@@ -101,6 +114,7 @@ function GoogleMapComponent({
 
       // Drag listener
       marker.addListener('dragend', () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const newPos = marker.position as any
         if (!newPos) return
 
@@ -110,7 +124,7 @@ function GoogleMapComponent({
         setPolygonPoints(prev => {
           const updated = [...prev]
           updated[index] = { lat: newLat, lng: newLng }
-          
+
           // Update polygon
           if (polygonRef.current && updated.length >= 3) {
             polygonRef.current.setPath(updated)
@@ -130,7 +144,7 @@ function GoogleMapComponent({
         if (!isLocked) {
           setPolygonPoints(prev => {
             const updated = prev.filter((_, i) => i !== index)
-            
+
             // Rebuild polygon
             if (polygonRef.current) {
               polygonRef.current.setMap(null)
@@ -165,19 +179,7 @@ function GoogleMapComponent({
 
       markersRef.current.push(marker)
     })
-  }
-
-  // Create marker HTML element
-  const createMarkerElement = (number: number) => {
-    const div = document.createElement('div')
-    div.innerHTML = `
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="16" cy="16" r="12" fill="${isLocked ? '#10b981' : '#EF4444'}" stroke="white" stroke-width="3"/>
-        <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${number}</text>
-      </svg>
-    `
-    return div
-  }
+  }, [isLocked, onPolygonChange, createMarkerElement])
 
   // Initialize map
   useEffect(() => {
@@ -198,8 +200,9 @@ function GoogleMapComponent({
     mapInstanceRef.current = map
   
     // Handle map clicks to add polygon points
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.addListener('click', (e: any) => {
-      if (isLocked) return
+      if (isLocked || !e.latLng) return
   
       const clickedLat = e.latLng.lat()
       const clickedLng = e.latLng.lng()
@@ -245,7 +248,7 @@ function GoogleMapComponent({
         polygonRef.current = null
       }
     }
-  }, []) // Empty dependency array - only run once
+  }, [isLocked, onPolygonChange, rebuildMarkers]) // Empty dependency array - only run once
   
   // Separate effect to update center when coordinates change
   useEffect(() => {
@@ -280,7 +283,7 @@ function GoogleMapComponent({
       // Rebuild markers with green color
       rebuildMarkers(polygonPoints)
     }
-  }, [isLocked, polygonPoints])
+  }, [isLocked, polygonPoints, rebuildMarkers])
 
   // Handle clear polygon
   useEffect(() => {
@@ -346,7 +349,9 @@ function GoogleMapComponent({
           })
         } else {
           // Fallback to legacy Marker
-          marker = new (window.google.maps as any).Marker({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const LegacyMarker = (window.google.maps as any).Marker
+          marker = new LegacyMarker({
             position: position,
             map: mapInstanceRef.current,
             title: restaurant.name,

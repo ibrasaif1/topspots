@@ -75,7 +75,6 @@ export default function AddCityPage() {
   const [polygon, setPolygon] = useState<{lat: number, lng: number}[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [result, setResult] = useState<{count: number, cost: number} | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
 
   // Fetch restaurant data for Austin and San Diego
@@ -96,6 +95,7 @@ export default function AddCityPage() {
               if (Array.isArray(data)) {
                 cityRestaurants = data;
               } else if (data.places && Array.isArray(data.places)) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 cityRestaurants = data.places.map((place: any) => ({
                   place_id: place.placeId || place.id,
                   name: place.name,
@@ -158,7 +158,7 @@ export default function AddCityPage() {
       // } else {
       //   alert(`Error: ${data.error}`);
       // }
-    } catch (error) {
+    } catch {
       alert('Failed to submit');
     } finally {
       setLoading(false);
@@ -230,7 +230,7 @@ export default function AddCityPage() {
           <DialogHeader>
             <DialogTitle>Search Results</DialogTitle>
             <DialogDescription>
-              Here's what we found in your selected area
+              Here&apos;s what we found in your selected area
             </DialogDescription>
           </DialogHeader>
 

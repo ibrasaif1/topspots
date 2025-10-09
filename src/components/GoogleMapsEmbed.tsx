@@ -3,60 +3,55 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Wrapper } from '@googlemaps/react-wrapper'
 
-// Google Maps TypeScript interfaces
-interface GoogleMapsMap {
-  setCenter: (center: { lat: number; lng: number }) => void
-  setZoom: (zoom: number) => void
-  addListener: (event: string, callback: (...args: unknown[]) => void) => void
-  getCenter?: () => { lat: () => number; lng: () => number }
-  getZoom?: () => number
-  fitBounds?: (bounds: unknown, padding?: unknown) => void
-}
-
-interface GoogleMapsMarker {
-  setMap: (map: GoogleMapsMap | null) => void
-  setPosition: (position: { lat: number; lng: number }) => void
-}
-
-interface GoogleMapsPolygon {
-  setMap: (map: GoogleMapsMap | null) => void
-  setPath?: (path: { lat: number; lng: number }[]) => void
-}
-
 interface GoogleMapsEmbedProps {
   location?: string
-  onCoordinatesChange?: (coords: {lat: number, lng: number}) => void
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
   clearPolygon?: boolean
   onPolygonCleared?: () => void
   isLocked?: boolean
-  showExistingPins?: boolean
+  centerOffset?: number
+  restaurants?: Array<{
+    place_id: string
+    name: string
+    rating: number
+    reviews: number
+    gps_coordinates: { latitude: number; longitude: number }
+    cuisine?: string
+    priceRange?: string
+  }>
 }
 
 function GoogleMapComponent({
   location,
-  onCoordinatesChange,
   onPolygonChange,
   clearPolygon,
   onPolygonCleared,
   isLocked,
-  showExistingPins,
-  currentZoom,
+  centerOffset,
+  restaurants,
 }: {
   location?: string
-  onCoordinatesChange?: (coords: {lat: number, lng: number}) => void
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
   clearPolygon?: boolean
   onPolygonCleared?: () => void
   isLocked?: boolean
-  showExistingPins?: boolean
-  currentZoom: number
+  centerOffset?: number
+  restaurants?: Array<{
+    place_id: string
+    name: string
+    rating: number
+    reviews: number
+    gps_coordinates: { latitude: number; longitude: number }
+    cuisine?: string
+    priceRange?: string
+  }>
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<GoogleMapsMap | null>(null)
-  const markerRef = useRef<GoogleMapsMarker[]>([])
-  const polygonRef = useRef<GoogleMapsPolygon | null>(null)
-  const existingPinsRef = useRef<GoogleMapsMarker[]>([])
+  const mapInstanceRef = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
+  const restaurantMarkersRef = useRef<any[]>([])
+  const infoWindowRef = useRef<any>(null)
+  const polygonRef = useRef<any>(null)
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<{lat: number, lng: number}[]>([])
   const [loading, setLoading] = useState(false)
@@ -75,9 +70,7 @@ function GoogleMapComponent({
 
         if (data.results && data.results.length > 0) {
           const { lat, lng } = data.results[0].geometry.location
-          const coords = { lat, lng }
-          setCoordinates(coords)
-          onCoordinatesChange?.(coords)
+          setCoordinates({ lat, lng })
         }
       } catch (error) {
         console.error('Geocoding error:', error)
@@ -87,143 +80,139 @@ function GoogleMapComponent({
     }
 
     geocodeLocation()
-  }, [location, onCoordinatesChange])
+  }, [location])
 
-  // Load existing restaurant pins
-  useEffect(() => {
-    if (!showExistingPins || !mapInstanceRef.current || !window.google?.maps) return
+  // Rebuild markers with correct numbering
+  const rebuildMarkers = (points: {lat: number, lng: number}[]) => {
+    if (!mapInstanceRef.current || !window.google?.maps) return
 
-    const loadExistingPins = async () => {
-      try {
-        // Load all restaurant data files
-        const cities = ['austin', 'san_diego']
-        const allRestaurants: Array<{
-          place_id?: string;
-          name?: string;
-          gps_coordinates?: { latitude: number; longitude: number };
-        }> = []
+    // Clear old markers
+    markersRef.current.forEach(marker => marker.setMap(null))
+    markersRef.current = []
 
-        for (const city of cities) {
-          try {
-            const res = await fetch(`/${city}_restaurants.json`, { cache: 'no-store' })
-            if (res.ok) {
-              const data = await res.json()
-              if (Array.isArray(data)) {
-                allRestaurants.push(...data)
-              } else if (data.places && Array.isArray(data.places)) {
-                allRestaurants.push(...data.places.map((place: { placeId?: string; id?: string; name?: string; location?: { latitude: number; longitude: number } }) => ({
-                  place_id: place.placeId || place.id,
-                  name: place.name,
-                  gps_coordinates: place.location || { latitude: 0, longitude: 0 }
-                })))
-              }
-            }
-          } catch (err) {
-            console.error(`Failed to load ${city} restaurants:`, err)
+    // Create new markers
+    points.forEach((point, index) => {
+      const marker = new window.google.maps.marker.AdvancedMarkerElement({
+        position: point,
+        map: mapInstanceRef.current,
+        gmpDraggable: !isLocked,
+        content: createMarkerElement(index + 1),
+      })
+
+      // Drag listener
+      marker.addListener('dragend', () => {
+        const newPos = marker.position
+        if (!newPos) return
+        
+        const newLat = typeof newPos.lat === 'function' ? newPos.lat() : newPos.lat
+        const newLng = typeof newPos.lng === 'function' ? newPos.lng() : newPos.lng
+
+        setPolygonPoints(prev => {
+          const updated = [...prev]
+          updated[index] = { lat: newLat, lng: newLng }
+          
+          // Update polygon
+          if (polygonRef.current && updated.length >= 3) {
+            polygonRef.current.setPath(updated)
           }
-        }
 
-        // Clear existing pins
-        existingPinsRef.current.forEach(marker => marker.setMap(null))
-        existingPinsRef.current = []
+          // Notify parent
+          if (updated.length === 4) {
+            onPolygonChange?.(updated)
+          }
 
-        // Create small gray markers for existing restaurants
-        allRestaurants.forEach((restaurant) => {
-          if (!restaurant.gps_coordinates?.latitude || !restaurant.gps_coordinates?.longitude) return
-
-          const marker = new (window.google.maps as unknown as { Marker: new (options: Record<string, unknown>) => GoogleMapsMarker }).Marker({
-            position: {
-              lat: restaurant.gps_coordinates.latitude,
-              lng: restaurant.gps_coordinates.longitude
-            },
-            map: mapInstanceRef.current!,
-            icon: {
-              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="4" cy="4" r="3" fill="#6B7280" opacity="0.6"/>
-                </svg>
-              `),
-              scaledSize: new window.google.maps.Size(8, 8),
-              anchor: new window.google.maps.Point(4, 4)
-            }
-          })
-
-          existingPinsRef.current.push(marker)
+          return updated
         })
-      } catch (error) {
-        console.error('Error loading existing pins:', error)
-      }
-    }
+      })
 
-    loadExistingPins()
+      // Click to remove (only if not locked)
+      marker.addListener('click', () => {
+        if (!isLocked) {
+          setPolygonPoints(prev => {
+            const updated = prev.filter((_, i) => i !== index)
+            
+            // Rebuild polygon
+            if (polygonRef.current) {
+              polygonRef.current.setMap(null)
+              polygonRef.current = null
+            }
 
-    return () => {
-      existingPinsRef.current.forEach(marker => marker.setMap(null))
-      existingPinsRef.current = []
-    }
-  }, [showExistingPins, coordinates])
+            if (updated.length >= 3) {
+              const polygon = new window.google.maps.Polygon({
+                paths: updated,
+                strokeColor: isLocked ? '#10b981' : '#3b82f6',
+                strokeOpacity: 0.8,
+                strokeWeight: 3,
+                fillColor: isLocked ? '#10b981' : '#3b82f6',
+                fillOpacity: isLocked ? 0.15 : 0.2,
+                map: mapInstanceRef.current
+              })
+              polygonRef.current = polygon
+            }
+
+            // Rebuild markers with new numbering
+            rebuildMarkers(updated)
+
+            // Notify parent
+            if (updated.length === 4) {
+              onPolygonChange?.(updated)
+            }
+
+            return updated
+          })
+        }
+      })
+
+      markersRef.current.push(marker)
+    })
+  }
+
+  // Create marker HTML element
+  const createMarkerElement = (number: number) => {
+    const div = document.createElement('div')
+    div.innerHTML = `
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="12" fill="${isLocked ? '#10b981' : '#EF4444'}" stroke="white" stroke-width="3"/>
+        <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${number}</text>
+      </svg>
+    `
+    return div
+  }
 
   // Initialize map
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps || !coordinates) return
+    if (!mapRef.current || !window.google?.maps || mapInstanceRef.current) return
 
     const map = new window.google.maps.Map(mapRef.current, {
-      center: coordinates,
-      zoom: currentZoom,
+      center: { lat: 35, lng: 240 },
+      zoom: 4,
+      minZoom: 3,
       streetViewControl: false,
       fullscreenControl: false,
       mapTypeControl: false,
       zoomControl: true,
-      gestureHandling: 'cooperative'
+      gestureHandling: 'cooperative',
+      mapId: "2ddce5326308b2176661a3da",
     })
-
+  
     mapInstanceRef.current = map
-
+  
     // Handle map clicks to add polygon points
-    map.addListener('click', (...args: unknown[]) => {
-      // Don't allow clicks if locked
-      if (isLocked) {
-        return
-      }
-
-      const e = args[0] as { latLng?: { lat: () => number; lng: () => number } }
-      const clickedLat = e.latLng?.lat() ?? 0
-      const clickedLng = e.latLng?.lng() ?? 0
+    map.addListener('click', (e: any) => {
+      if (isLocked) return
+  
+      const clickedLat = e.latLng.lat()
+      const clickedLng = e.latLng.lng()
       const newPoint = { lat: clickedLat, lng: clickedLng }
-
+  
       setPolygonPoints(prev => {
-        // Only allow 4 points max
-        if (prev.length >= 4) {
-          return prev
-        }
-
+        if (prev.length >= 4) return prev
+  
         const updated = [...prev, newPoint]
-
-        // Create marker for this point
-        const marker = new (window.google.maps as unknown as { Marker: new (options: Record<string, unknown>) => GoogleMapsMarker }).Marker({
-          position: newPoint,
-          map: map,
-          label: {
-            text: (updated.length).toString(),
-            color: 'white',
-            fontWeight: 'bold'
-          },
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="16" cy="16" r="12" fill="#EF4444" stroke="white" stroke-width="3"/>
-              </svg>
-            `),
-            scaledSize: new window.google.maps.Size(32, 32),
-            anchor: new window.google.maps.Point(16, 16)
-          }
-        })
-        markerRef.current.push(marker)
-
-        // Update or create polygon
+  
         if (updated.length >= 3) {
           if (polygonRef.current) {
-            polygonRef.current.setPath?.(updated)
+            polygonRef.current.setPath(updated)
           } else {
             const polygon = new window.google.maps.Polygon({
               paths: updated,
@@ -237,81 +226,201 @@ function GoogleMapComponent({
             polygonRef.current = polygon
           }
         }
-
-        // Notify parent of polygon change
+  
+        rebuildMarkers(updated)
+  
         if (updated.length === 4) {
           onPolygonChange?.(updated)
         }
-
+  
         return updated
       })
     })
-
+  
     return () => {
-      markerRef.current.forEach(marker => marker.setMap(null))
-      markerRef.current = []
+      markersRef.current.forEach(marker => marker.setMap(null))
+      markersRef.current = []
       if (polygonRef.current) {
         polygonRef.current.setMap(null)
         polygonRef.current = null
       }
     }
-  }, [coordinates, currentZoom, onPolygonChange, isLocked])
+  }, []) // Empty dependency array - only run once
+  
+  // Separate effect to update center when coordinates change
+  useEffect(() => {
+    if (!mapInstanceRef.current || !coordinates) return
+  
+    let center = coordinates;
+    if (centerOffset) {
+      const offsetLng = coordinates.lng + (centerOffset * 0.01);
+      center = { lat: coordinates.lat, lng: offsetLng };
+    }
+  
+    mapInstanceRef.current.setCenter(center)
+    mapInstanceRef.current.setZoom(12)
+  }, [coordinates, centerOffset])
+  
 
   // Update polygon color when locked
   useEffect(() => {
-    if (polygonRef.current && isLocked) {
+    if (polygonRef.current && isLocked && window.google?.maps?.Polygon) {
       polygonRef.current.setMap(null)
-      if (window.google?.maps?.Polygon) {
-        const lockedPolygon = new window.google.maps.Polygon({
-          paths: polygonPoints,
-          strokeColor: '#10b981',
-          strokeOpacity: 0.8,
-          strokeWeight: 3,
-          fillColor: '#10b981',
-          fillOpacity: 0.15,
-          map: mapInstanceRef.current!
-        })
-        polygonRef.current = lockedPolygon
-      }
+      const lockedPolygon = new window.google.maps.Polygon({
+        paths: polygonPoints,
+        strokeColor: '#10b981',
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        fillColor: '#10b981',
+        fillOpacity: 0.15,
+        map: mapInstanceRef.current
+      })
+      polygonRef.current = lockedPolygon
+      
+      // Rebuild markers with green color
+      rebuildMarkers(polygonPoints)
     }
   }, [isLocked, polygonPoints])
 
   // Handle clear polygon
   useEffect(() => {
     if (clearPolygon) {
-      // Clear markers
-      markerRef.current.forEach(marker => marker.setMap(null))
-      markerRef.current = []
+      markersRef.current.forEach(marker => marker.setMap(null))
+      markersRef.current = []
 
-      // Clear polygon
       if (polygonRef.current) {
         polygonRef.current.setMap(null)
         polygonRef.current = null
       }
 
-      // Reset state
       setPolygonPoints([])
-
-      // Notify parent that clearing is complete
       onPolygonCleared?.()
     }
   }, [clearPolygon, onPolygonCleared])
 
-  if (loading) {
-    return (
-      <div className="w-full h-full rounded-lg overflow-hidden shadow-lg relative bg-gray-100 flex items-center justify-center">
-        <div className="text-gray-500">Loading map...</div>
-      </div>
-    )
-  }
+  // Add restaurant markers
+  useEffect(() => {
+    if (!mapInstanceRef.current || !restaurants || restaurants.length === 0 || !window.google?.maps) return
 
-  if (!coordinates) {
-    return (
-      <div className="w-full h-full rounded-lg overflow-hidden shadow-lg relative bg-gray-100 flex items-center justify-center">
-        <div className="text-gray-500">Enter a location to view map</div>
-      </div>
-    )
-  }
+    // Clear old restaurant markers
+    restaurantMarkersRef.current.forEach(marker => marker.setMap(null))
+    restaurantMarkersRef.current = []
+
+    const escapeHtml = (value: string) =>
+      value.replace(/[&<>"']/g, (char) => {
+        switch (char) {
+          case "&": return "&amp;";
+          case "<": return "&lt;";
+          case ">": return "&gt;";
+          case '"': return "&quot;";
+          case "'": return "&#39;";
+          default: return char;
+        }
+      });
+
+    restaurants.forEach((restaurant) => {
+      if (!restaurant.gps_coordinates?.latitude || !restaurant.gps_coordinates?.longitude) return
+
+      const position = {
+        lat: restaurant.gps_coordinates.latitude,
+        lng: restaurant.gps_coordinates.longitude
+      }
+
+      let marker;
+
+      try {
+        // Use AdvancedMarkerElement if available
+        if (window.google.maps.marker?.PinElement && window.google.maps.marker?.AdvancedMarkerElement) {
+          const pin = new window.google.maps.marker.PinElement({
+            background: "#EF4444",
+            borderColor: "#DC2626",
+            glyphColor: "#FFFFFF",
+            scale: 1,
+          })
+
+          marker = new window.google.maps.marker.AdvancedMarkerElement({
+            position: position,
+            map: mapInstanceRef.current,
+            title: restaurant.name,
+            content: pin.element,
+          })
+        } else {
+          // Fallback to legacy Marker
+          marker = new (window.google.maps as any).Marker({
+            position: position,
+            map: mapInstanceRef.current,
+            title: restaurant.name,
+            icon: {
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
+                </svg>
+              `),
+              scaledSize: new window.google.maps.Size(24, 24),
+              anchor: new window.google.maps.Point(12, 24)
+            }
+          })
+        }
+      } catch (error) {
+        console.warn('Failed to create restaurant marker:', error)
+        return
+      }
+
+      // Add click listener to show info window
+      marker.addListener('click', () => {
+        // Close existing InfoWindow
+        if (infoWindowRef.current) {
+          infoWindowRef.current.close()
+        }
+
+        // Create InfoWindow if it doesn't exist
+        if (!infoWindowRef.current) {
+          infoWindowRef.current = new window.google.maps.InfoWindow({
+            zIndex: 2000
+          })
+        }
+
+        const detailParts: string[] = []
+        if (restaurant.cuisine) detailParts.push(escapeHtml(restaurant.cuisine))
+        if (restaurant.priceRange) detailParts.push(escapeHtml(restaurant.priceRange))
+
+        const cleanPlaceId = restaurant.place_id.replace('places/', '')
+        const googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${cleanPlaceId}`
+
+        const content = `
+          <div style="
+            padding: 0;
+            margin: 0;
+            max-width: 260px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.3;
+            cursor: pointer;
+          " onclick="window.open('${googleMapsUrl}', '_blank')">
+            <div style="font-weight: 600; font-size: 15px; color: #111827; margin: 0 0 6px 0;">
+              ${escapeHtml(restaurant.name)}
+            </div>
+
+            ${restaurant.rating ? `<div style="color: #059669; margin: 0 0 4px 0; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${restaurant.reviews?.toLocaleString() ?? 0} reviews</div>` : ""}
+
+            ${detailParts.length ? `<div style="color: #6b7280; font-size: 12px; margin: 0;">${detailParts.join(" · ")}</div>` : ""}
+          </div>
+        `
+
+        infoWindowRef.current.setContent(content)
+        infoWindowRef.current.open(mapInstanceRef.current, marker)
+      })
+
+      restaurantMarkersRef.current.push(marker)
+    })
+
+    return () => {
+      restaurantMarkersRef.current.forEach(marker => marker.setMap(null))
+      restaurantMarkersRef.current = []
+      if (infoWindowRef.current) {
+        infoWindowRef.current.close()
+      }
+    }
+  }, [restaurants])
 
   return (
     <div className="w-full h-full rounded-lg overflow-hidden shadow-lg relative">
@@ -330,15 +439,13 @@ function GoogleMapComponent({
 
 export default function GoogleMapsEmbed({
   location = "New York, NY",
-  onCoordinatesChange,
   onPolygonChange,
   clearPolygon,
   onPolygonCleared,
   isLocked,
-  showExistingPins
+  centerOffset,
+  restaurants,
 }: GoogleMapsEmbedProps) {
-  const [currentZoom] = useState(12)
-
   return (
     <Wrapper
       apiKey={process.env.NODE_ENV === 'production'
@@ -349,13 +456,12 @@ export default function GoogleMapsEmbed({
     >
       <GoogleMapComponent
         location={location}
-        onCoordinatesChange={onCoordinatesChange}
         onPolygonChange={onPolygonChange}
         clearPolygon={clearPolygon}
         onPolygonCleared={onPolygonCleared}
         isLocked={isLocked}
-        showExistingPins={showExistingPins}
-        currentZoom={currentZoom}
+        centerOffset={centerOffset}
+        restaurants={restaurants}
       />
     </Wrapper>
   )

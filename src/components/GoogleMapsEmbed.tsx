@@ -101,11 +101,11 @@ function GoogleMapComponent({
 
       // Drag listener
       marker.addListener('dragend', () => {
-        const newPos = marker.position
+        const newPos = marker.position as any
         if (!newPos) return
-        
-        const newLat = typeof newPos.lat === 'function' ? newPos.lat() : newPos.lat
-        const newLng = typeof newPos.lng === 'function' ? newPos.lng() : newPos.lng
+
+        const newLat = typeof newPos.lat === 'function' ? (newPos.lat as () => number)() : (newPos.lat as number)
+        const newLng = typeof newPos.lng === 'function' ? (newPos.lng as () => number)() : (newPos.lng as number)
 
         setPolygonPoints(prev => {
           const updated = [...prev]

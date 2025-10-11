@@ -1,4 +1,10 @@
+## UX Requirements:
+- When the user loads the page, they should be guided on how to use it
+    - 
+
 ## Tasks:
+- Onboarding Modal with video
+
 - Flesh out backend fully
 - Start implementing
 

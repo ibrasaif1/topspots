@@ -75,6 +75,7 @@ export default function AddCityPage() {
   const [polygon, setPolygon] = useState<{lat: number, lng: number}[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
 
   // Fetch restaurant data for Austin and San Diego
@@ -166,12 +167,27 @@ export default function AddCityPage() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 relative">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 relative">
       <div className="absolute left-0 top-0 bottom-0 w-1/3 p-8 bg-white/10 backdrop-blur-xl border-r border-white/20 z-10 flex items-center justify-center">
         <div className="w-full max-w-md">
-          <h1 className="text-6xl font-bold text-slate-900 mb-6">
-            Add New City
-          </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-6xl font-bold text-slate-900">
+              TopSpots
+            </h1>
+            <button
+              onClick={() => setHelpOpen(true)}
+              className="ml-4 w-8 h-8 rounded-full border-2 border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 flex items-center justify-center text-lg font-semibold transition-colors"
+              aria-label="Help"
+            >
+              ?
+            </button>
+          </div>
+          <div className="text-sm text-slate-500 mb-2">
+            4.5★+ • 1000+ reviews
+          </div>
+          <div className="text-m text-slate-700 mb-4">
+            Zoom in or search for an area to conduct your own search
+          </div>
 
           <div className="space-y-4">
             <div>
@@ -183,7 +199,7 @@ export default function AddCityPage() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Enter city or address..."
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+                className="w-full px-4 py-2 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
               />
             </div>
 
@@ -250,6 +266,50 @@ export default function AddCityPage() {
               </Button>
             </div>
           }
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>How TopSpots Works</DialogTitle>
+            <DialogDescription>
+              Discover top-rated restaurants in any city
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                🗺️ Browse Existing Spots
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-100">
+                Zoom out on the map to see restaurants in Austin and San Diego. Click any marker to view details and ratings.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                🔍 Search New Locations
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-100">
+                Enter any city or address in the search box. The map will show you all the top-rated spots in that area.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                📍 Create Custom Search Area
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-100">
+                Click 4 points on the map to create a custom polygon. We&apos;ll find all restaurants with 4.5+ stars and 1000+ reviews in that area.
+              </p>
+            </div>
+
+            <Button onClick={() => setHelpOpen(false)} className="w-full">
+              Got it!
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

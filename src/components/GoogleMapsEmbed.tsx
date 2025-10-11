@@ -189,10 +189,7 @@ function GoogleMapComponent({
       center: { lat: 35, lng: 240 },
       zoom: 4,
       minZoom: 3,
-      streetViewControl: false,
-      fullscreenControl: false,
-      mapTypeControl: false,
-      zoomControl: true,
+      disableDefaultUI: true,
       gestureHandling: 'cooperative',
       mapId: "2ddce5326308b2176661a3da",
     })

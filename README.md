@@ -1,10 +1,11 @@
 ## UX Requirements:
 - When the user loads the page, they should be guided on how to use it
-    - 
+    - Have to select clockwise
 
 ## Tasks:
+- Clear points button
 - Onboarding Modal with video
-
+- Dark Mode
 - Flesh out backend fully
 - Start implementing
 

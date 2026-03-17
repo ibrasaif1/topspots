@@ -31,6 +31,7 @@ export default function CategoryFilter({ selected, onChange }: CategoryFilterPro
           key={cat.id}
           value={cat.id}
           aria-label={cat.label}
+          title={cat.description}
           className="rounded-full px-3 py-1 text-xs font-medium border border-slate-300 data-[state=on]:bg-slate-900 data-[state=on]:text-white data-[state=on]:border-slate-900 hover:bg-slate-100"
         >
           {cat.label}

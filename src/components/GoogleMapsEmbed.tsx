@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Wrapper } from '@googlemaps/react-wrapper'
+import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer'
+import type { Renderer } from '@googlemaps/markerclusterer'
 import { isCounterClockwise } from '@/lib/utils'
 
 type Bounds = { north: number; south: number; east: number; west: number }
@@ -72,6 +74,12 @@ function GoogleMapComponent({
   const markersRef = useRef<any[]>([])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const restaurantMarkersRef = useRef<Map<string, any>>(new Map())
+  const clustererRef = useRef<MarkerClusterer | null>(null)
+  const markerEventDataRef = useRef<Map<string, {
+    showInfoWindow: () => void
+    hideInfoWindow: () => void
+    googleMapsUrl: string
+  }>>(new Map())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null)
   const infoWindowCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -422,13 +430,18 @@ function GoogleMapComponent({
     }
   }, [clearPolygon, onPolygonCleared])
 
-  // Add restaurant markers
+  // Add restaurant markers with clustering
   useEffect(() => {
     if (!mapInstanceRef.current || !restaurants || restaurants.length === 0 || !window.google?.maps) return
 
-    // Clear old restaurant markers
+    // Clear old clusterer and markers
+    if (clustererRef.current) {
+      clustererRef.current.clearMarkers()
+      clustererRef.current = null
+    }
     restaurantMarkersRef.current.forEach(marker => marker.setMap(null))
     restaurantMarkersRef.current.clear()
+    markerEventDataRef.current.clear()
 
     const escapeHtml = (value: string) =>
       value.replace(/[&<>"']/g, (char) => {
@@ -441,6 +454,9 @@ function GoogleMapComponent({
           default: return char;
         }
       });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allMarkers: any[] = []
 
     restaurants.forEach((restaurant) => {
       if (!restaurant.gps_coordinates?.latitude || !restaurant.gps_coordinates?.longitude) return
@@ -457,9 +473,9 @@ function GoogleMapComponent({
         scale: 1,
       })
 
+      // Don't set map — the clusterer manages map attachment
       const marker = new window.google.maps.marker.AdvancedMarkerElement({
         position: position,
-        map: mapInstanceRef.current,
         title: restaurant.name,
         content: pin.element,
       })
@@ -553,12 +569,73 @@ function GoogleMapComponent({
         markerElement.style.cursor = 'pointer'
       }
 
+      // Store event data for re-attaching after hover highlight swaps content
+      markerEventDataRef.current.set(restaurant.place_id, {
+        showInfoWindow,
+        hideInfoWindow,
+        googleMapsUrl,
+      })
+
       restaurantMarkersRef.current.set(restaurant.place_id, marker)
+      allMarkers.push(marker)
     })
 
+    // Custom cluster renderer — red circles matching the app's pin style
+    const clusterRenderer: Renderer = {
+      render({ count, position }) {
+        const size = Math.min(60, 36 + Math.log2(count) * 6)
+        const svg = `
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="#EF4444" stroke="white" stroke-width="3" opacity="0.9"/>
+            <text x="${size / 2}" y="${size / 2 + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${count}</text>
+          </svg>
+        `
+        const div = document.createElement('div')
+        div.innerHTML = svg
+        div.style.cursor = 'pointer'
+        div.style.transform = `translateY(${size / 2}px)`
+
+        return new window.google.maps.marker.AdvancedMarkerElement({
+          position,
+          content: div,
+          zIndex: 999999 + count,
+        })
+      },
+    }
+
+    // Create clusterer — maxZoom:9 means zoom 10+ shows individual markers
+    clustererRef.current = new MarkerClusterer({
+      map: mapInstanceRef.current,
+      markers: allMarkers,
+      algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 9 }),
+      renderer: clusterRenderer,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onClusterClick: (_: any, cluster: any, map: any) => {
+        const pos = cluster.position
+        if (!pos) return
+        const currentZoom = map.getZoom() ?? 4
+        // Zoom in by 2 levels instead of fitting tightly
+        const targetZoom = Math.min(currentZoom + 2, 15)
+        // Shift center to the right to account for left sidebar overlay
+        const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng
+        const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat
+        const offsetLng = lng + 0.02 / Math.pow(2, targetZoom - 10)
+        map.setZoom(targetZoom)
+        map.panTo({ lat, lng: offsetLng })
+      },
+    })
+
+    const currentRestaurantMarkers = restaurantMarkersRef.current
+    const currentMarkerEventData = markerEventDataRef.current
+
     return () => {
-      restaurantMarkersRef.current.forEach(marker => marker.setMap(null))
-      restaurantMarkersRef.current.clear()
+      if (clustererRef.current) {
+        clustererRef.current.clearMarkers()
+        clustererRef.current = null
+      }
+      currentRestaurantMarkers.forEach(marker => marker.setMap(null))
+      currentRestaurantMarkers.clear()
+      currentMarkerEventData.clear()
       if (infoWindowRef.current) {
         infoWindowRef.current.close()
       }
@@ -579,7 +656,6 @@ function GoogleMapComponent({
 
       try {
         if (marker.content) {
-          // AdvancedMarkerElement
           if (isHovered) {
             const highlightedPin = new window.google.maps.marker.PinElement({
               background: "#3B82F6",
@@ -598,6 +674,21 @@ function GoogleMapComponent({
             })
             marker.content = normalPin.element
             marker.zIndex = 1
+          }
+
+          // Re-attach event listeners since content was replaced
+          const eventData = markerEventDataRef.current.get(placeId)
+          if (eventData) {
+            const el = marker.content as HTMLElement | null
+            if (el) {
+              el.addEventListener('mouseenter', eventData.showInfoWindow)
+              el.addEventListener('mouseleave', eventData.hideInfoWindow)
+              el.addEventListener('click', (e: Event) => {
+                e.stopPropagation()
+                window.open(eventData.googleMapsUrl, '_blank')
+              })
+              el.style.cursor = 'pointer'
+            }
           }
         }
       } catch (error) {

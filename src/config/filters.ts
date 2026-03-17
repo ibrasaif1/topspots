@@ -14,12 +14,13 @@ export interface CategoryConfig {
   description: string;
   minRating: number;
   minReviews: number;
+  maxReviews?: number;
 }
 
 export const CATEGORIES: CategoryConfig[] = [
   { id: 'topspots', label: 'TopSpots', description: '4.5★+ • 1000+ reviews', minRating: 4.5, minReviews: 1000 },
-  { id: 'hidden-gems', label: 'Hidden Gems', description: '4.8★+ • 500+ reviews', minRating: 4.8, minReviews: 500 },
-  { id: 'on-the-come-up', label: 'On The Come Up', description: '4.5★+ • All reviews', minRating: 4.5, minReviews: 0 },
+  { id: 'hidden-gems', label: 'Hidden Gems', description: '4.8★+ • 800-999 reviews', minRating: 4.8, minReviews: 800, maxReviews: 999 },
+  { id: 'on-the-come-up', label: 'On The Come Up', description: '4.5★+ • 800-999 reviews', minRating: 4.5, minReviews: 800, maxReviews: 999 },
 ];
 
 export const DEFAULT_SELECTED_CATEGORIES: CategoryId[] = ['topspots'];
@@ -34,7 +35,8 @@ export function matchesAnyCategory(
     (cat) =>
       selectedCategories.includes(cat.id) &&
       rating >= cat.minRating &&
-      reviews >= cat.minReviews
+      reviews >= cat.minReviews &&
+      (cat.maxReviews === undefined || reviews <= cat.maxReviews)
   );
 }
 

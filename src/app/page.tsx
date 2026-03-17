@@ -36,6 +36,7 @@ export default function Page() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [placeCount, setPlaceCount] = useState<number | null>(null);
   const [clearPolygon, setClearPolygon] = useState(false);
+  const [mockMode, setMockMode] = useState(false);
   
   // Viewport tracking state
   const [zoom, setZoom] = useState<number>(4);
@@ -157,6 +158,7 @@ export default function Page() {
 
       if (response.ok) {
         setPlaceCount(data.count);
+        if (data.mock) setMockMode(true);
         setModalOpen(true);
       } else {
         alert(`Error: ${data.error || 'Failed to get count'}`);
@@ -185,6 +187,7 @@ export default function Page() {
       
       if (response.ok) {
         const data = await response.json();
+        if (data.mock) setMockMode(true);
         // Convert backend response to Restaurant format
         // Filter to only show places with 1000+ reviews (TopSpots criteria)
         const MIN_REVIEWS = 1000;
@@ -230,8 +233,13 @@ export default function Page() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 relative">
-      <div className="absolute left-0 top-0 bottom-0 w-1/3 p-8 bg-white/10 dark:bg-black/10 backdrop-blur-xl border-r border-white/20 z-10 flex items-center justify-center">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 relative overflow-hidden">
+      {mockMode && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-amber-400 text-amber-900 text-xs font-semibold text-center py-1">
+          MOCK MODE — Data is simulated
+        </div>
+      )}
+      <div className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 w-1/3 p-8 bg-white/10 dark:bg-black/10 backdrop-blur-xl border-r border-white/20 z-10 flex items-center justify-center`}>
         <div className="w-full max-w-md">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-6xl font-bold text-slate-900">
@@ -324,6 +332,7 @@ export default function Page() {
           isLocked={false}
           centerOffset={-7}
           restaurants={restaurants}
+          zoom={zoom}
           onZoomChange={handleZoomChange}
           onBoundsChange={handleBoundsChange}
           hoveredRestaurantId={hoveredRestaurantId}
@@ -409,14 +418,16 @@ export default function Page() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Search Results</DialogTitle>
+            <DialogTitle>Search Results{mockMode ? ' (Mock)' : ''}</DialogTitle>
             <DialogDescription>
-              Here&apos;s what we found in your selected area
+              {mockMode
+                ? 'Simulated results — no real API calls were made'
+                : "Here's what we found in your selected area"}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className={`p-4 border rounded-lg ${mockMode ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
               <p className="text-2xl font-bold text-slate-900 text-center">
                 {placeCount !== null ? placeCount : '—'}
               </p>
@@ -424,7 +435,7 @@ export default function Page() {
                 places found in this area
               </p>
 
-              {placeCount !== null && placeCount > 0 && (
+              {placeCount !== null && placeCount > 0 && !mockMode && (
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <div className="flex flex-col items-center">
                     <p className="text-lg font-semibold text-slate-800">

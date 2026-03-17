@@ -4,51 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Wrapper } from '@googlemaps/react-wrapper'
 import { isCounterClockwise } from '@/lib/utils'
 
-type Point = { lat: number; lng: number }
-type Triangle = Point[]
-
-// Helper function to calculate centroid of polygon points
-function calculateCentroid(points: Point[]): Point {
-  const sum = points.reduce(
-    (acc, p) => ({ lat: acc.lat + p.lat, lng: acc.lng + p.lng }),
-    { lat: 0, lng: 0 }
-  )
-  return {
-    lat: sum.lat / points.length,
-    lng: sum.lng / points.length
-  }
-}
-
-// Create triangles from polygon vertices to centroid
-function createTrianglesFromCentroid(polygon: Point[]): Triangle[] {
-  const center = calculateCentroid(polygon)
-  const triangles: Triangle[] = []
-
-  for (let i = 0; i < polygon.length; i++) {
-    const next = (i + 1) % polygon.length
-    triangles.push([polygon[i], polygon[next], center])
-  }
-
-  return triangles
-}
-
-// Recursively subdivide triangles
-function subdivideTrianglesRecursively(triangles: Triangle[], depth: number): Triangle[] {
-  if (depth <= 0) return triangles
-
-  const subdivided: Triangle[] = []
-  for (const tri of triangles) {
-    const [a, b, c] = tri
-    const ab = { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 }
-    const bc = { lat: (b.lat + c.lat) / 2, lng: (b.lng + c.lng) / 2 }
-    const ca = { lat: (c.lat + a.lat) / 2, lng: (c.lng + a.lng) / 2 }
-
-    subdivided.push([a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca])
-  }
-
-  return subdivideTrianglesRecursively(subdivided, depth - 1)
-}
-
 type Bounds = { north: number; south: number; east: number; west: number }
 
 interface GoogleMapsEmbedProps {
@@ -68,20 +23,7 @@ interface GoogleMapsEmbedProps {
     cuisine?: string
     priceRange?: string
   }>
-  showSubdivisions?: boolean
-  subdivisionDepth?: number
-  // Dev mode visualization props
-  activeQuadrants?: Point[][]
-  completedQuadrants?: Point[][]
-  progressiveRestaurants?: Array<{
-    place_id: string
-    name: string
-    rating: number
-    reviews: number
-    gps_coordinates: { latitude: number; longitude: number }
-    cuisine?: string
-    priceRange?: string
-  }>
+  zoom?: number
   // Viewport tracking props
   onZoomChange?: (zoom: number) => void
   onBoundsChange?: (bounds: Bounds) => void
@@ -97,11 +39,7 @@ function GoogleMapComponent({
   isLocked,
   centerOffset,
   restaurants,
-  showSubdivisions,
-  subdivisionDepth,
-  activeQuadrants,
-  completedQuadrants,
-  progressiveRestaurants,
+  zoom,
   onZoomChange,
   onBoundsChange,
   hoveredRestaurantId,
@@ -122,19 +60,7 @@ function GoogleMapComponent({
     cuisine?: string
     priceRange?: string
   }>
-  showSubdivisions?: boolean
-  subdivisionDepth?: number
-  activeQuadrants?: Point[][]
-  completedQuadrants?: Point[][]
-  progressiveRestaurants?: Array<{
-    place_id: string
-    name: string
-    rating: number
-    reviews: number
-    gps_coordinates: { latitude: number; longitude: number }
-    cuisine?: string
-    priceRange?: string
-  }>
+  zoom?: number
   onZoomChange?: (zoom: number) => void
   onBoundsChange?: (bounds: Bounds) => void
   hoveredRestaurantId?: string | null
@@ -150,19 +76,10 @@ function GoogleMapComponent({
   const infoWindowRef = useRef<any>(null)
   const infoWindowCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isHoveringInfoWindowRef = useRef<boolean>(false)
+  const zoomRef = useRef<number>(zoom ?? 0)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const polygonRef = useRef<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subdivisionPolygonsRef = useRef<any[]>([])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const centroidMarkerRef = useRef<any>(null)
-  // Dev mode visualization refs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const activeQuadPolygonsRef = useRef<any[]>([])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const completedQuadPolygonsRef = useRef<any[]>([])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const progressiveMarkersRef = useRef<any[]>([])
+  useEffect(() => { zoomRef.current = zoom ?? 0 }, [zoom])
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<{lat: number, lng: number}[]>([])
 
@@ -533,47 +450,19 @@ function GoogleMapComponent({
         lng: restaurant.gps_coordinates.longitude
       }
 
-      let marker;
+      const pin = new window.google.maps.marker.PinElement({
+        background: "#EF4444",
+        borderColor: "#DC2626",
+        glyphColor: "#FFFFFF",
+        scale: 1,
+      })
 
-      try {
-        // Use AdvancedMarkerElement if available
-        if (window.google.maps.marker?.PinElement && window.google.maps.marker?.AdvancedMarkerElement) {
-          const pin = new window.google.maps.marker.PinElement({
-            background: "#EF4444",
-            borderColor: "#DC2626",
-            glyphColor: "#FFFFFF",
-            scale: 1,
-          })
-
-          marker = new window.google.maps.marker.AdvancedMarkerElement({
-            position: position,
-            map: mapInstanceRef.current,
-            title: restaurant.name,
-            content: pin.element,
-          })
-        } else {
-          // Fallback to legacy Marker
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const LegacyMarker = (window.google.maps as any).Marker
-          marker = new LegacyMarker({
-            position: position,
-            map: mapInstanceRef.current,
-            title: restaurant.name,
-            icon: {
-              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#EF4444"/>
-                </svg>
-              `),
-              scaledSize: new window.google.maps.Size(24, 24),
-              anchor: new window.google.maps.Point(12, 24)
-            }
-          })
-        }
-      } catch (error) {
-        console.warn('Failed to create restaurant marker:', error)
-        return
-      }
+      const marker = new window.google.maps.marker.AdvancedMarkerElement({
+        position: position,
+        map: mapInstanceRef.current,
+        title: restaurant.name,
+        content: pin.element,
+      })
 
       // Build info window content
       const detailParts: string[] = []
@@ -603,6 +492,8 @@ function GoogleMapComponent({
       `
 
       const showInfoWindow = () => {
+        if (zoomRef.current < 10) return
+
         // Clear any pending close timeout
         if (infoWindowCloseTimeoutRef.current) {
           clearTimeout(infoWindowCloseTimeoutRef.current)
@@ -651,9 +542,8 @@ function GoogleMapComponent({
       }
 
       // Add hover and click listeners
-      const markerElement = marker.content || marker.element
+      const markerElement = marker.content as HTMLElement | null
       if (markerElement) {
-        // AdvancedMarkerElement - use DOM events
         markerElement.addEventListener('mouseenter', showInfoWindow)
         markerElement.addEventListener('mouseleave', hideInfoWindow)
         markerElement.addEventListener('click', (e: Event) => {
@@ -661,13 +551,6 @@ function GoogleMapComponent({
           window.open(googleMapsUrl, '_blank')
         })
         markerElement.style.cursor = 'pointer'
-      } else {
-        // Legacy Marker - use Maps API events
-        marker.addListener('mouseover', showInfoWindow)
-        marker.addListener('mouseout', hideInfoWindow)
-        marker.addListener('click', () => {
-          window.open(googleMapsUrl, '_blank')
-        })
       }
 
       restaurantMarkersRef.current.set(restaurant.place_id, marker)
@@ -723,188 +606,6 @@ function GoogleMapComponent({
     })
   }, [hoveredRestaurantId])
 
-  // Visualize subdivisions in dev mode
-  useEffect(() => {
-    if (!mapInstanceRef.current || !showSubdivisions || polygonPoints.length !== 4 || !window.google?.maps) {
-      // Clear existing visualizations
-      subdivisionPolygonsRef.current.forEach(poly => poly.setMap(null))
-      subdivisionPolygonsRef.current = []
-      if (centroidMarkerRef.current) {
-        centroidMarkerRef.current.setMap(null)
-        centroidMarkerRef.current = null
-      }
-      return
-    }
-
-    // Clear existing visualizations
-    subdivisionPolygonsRef.current.forEach(poly => poly.setMap(null))
-    subdivisionPolygonsRef.current = []
-    if (centroidMarkerRef.current) {
-      centroidMarkerRef.current.setMap(null)
-      centroidMarkerRef.current = null
-    }
-
-    // Calculate centroid
-    const centroid = calculateCentroid(polygonPoints)
-
-    // Create centroid marker
-    const centroidDiv = document.createElement('div')
-    centroidDiv.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="8" fill="#8B5CF6" stroke="white" stroke-width="2"/>
-      </svg>
-    `
-
-    if (window.google.maps.marker?.AdvancedMarkerElement) {
-      centroidMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-        position: centroid,
-        map: mapInstanceRef.current,
-        content: centroidDiv,
-      })
-    }
-
-    // Create initial triangles
-    const initialTriangles = createTrianglesFromCentroid(polygonPoints)
-
-    // Subdivide recursively
-    const depth = subdivisionDepth ?? 2
-    const allTriangles = subdivideTrianglesRecursively(initialTriangles, depth)
-
-    // Draw all triangles
-    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-    allTriangles.forEach((triangle: Triangle, index: number) => {
-      const color = colors[index % colors.length]
-      const poly = new window.google.maps.Polygon({
-        paths: triangle,
-        strokeColor: color,
-        strokeOpacity: 0.6,
-        strokeWeight: 1,
-        fillColor: color,
-        fillOpacity: 0.1,
-        map: mapInstanceRef.current
-      })
-      subdivisionPolygonsRef.current.push(poly)
-    })
-
-    return () => {
-      subdivisionPolygonsRef.current.forEach(poly => poly.setMap(null))
-      subdivisionPolygonsRef.current = []
-      if (centroidMarkerRef.current) {
-        centroidMarkerRef.current.setMap(null)
-        centroidMarkerRef.current = null
-      }
-    }
-  }, [showSubdivisions, polygonPoints, subdivisionDepth])
-
-  // Visualize active quadrants (being processed)
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.google?.maps) return
-
-    // Clear previous active quadrant polygons
-    activeQuadPolygonsRef.current.forEach(p => p.setMap(null))
-    activeQuadPolygonsRef.current = []
-
-    if (!activeQuadrants || activeQuadrants.length === 0) return
-
-    // Draw active quadrants with colored borders
-    const colors = ['#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6']
-    activeQuadrants.forEach((quad, index) => {
-      const color = colors[index % colors.length]
-      const poly = new window.google.maps.Polygon({
-        paths: quad,
-        strokeColor: color,
-        strokeOpacity: 0.9,
-        strokeWeight: 3,
-        fillColor: color,
-        fillOpacity: 0.15,
-        map: mapInstanceRef.current
-      })
-      activeQuadPolygonsRef.current.push(poly)
-    })
-
-    return () => {
-      activeQuadPolygonsRef.current.forEach(p => p.setMap(null))
-      activeQuadPolygonsRef.current = []
-    }
-  }, [activeQuadrants])
-
-  // Visualize completed quadrants
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.google?.maps) return
-
-    // Clear previous completed quadrant polygons
-    completedQuadPolygonsRef.current.forEach(p => p.setMap(null))
-    completedQuadPolygonsRef.current = []
-
-    if (!completedQuadrants || completedQuadrants.length === 0) return
-
-    // Draw completed quadrants with muted green
-    completedQuadrants.forEach((quad) => {
-      const poly = new window.google.maps.Polygon({
-        paths: quad,
-        strokeColor: '#10b981',
-        strokeOpacity: 0.5,
-        strokeWeight: 1,
-        fillColor: '#10b981',
-        fillOpacity: 0.08,
-        map: mapInstanceRef.current
-      })
-      completedQuadPolygonsRef.current.push(poly)
-    })
-
-    return () => {
-      completedQuadPolygonsRef.current.forEach(p => p.setMap(null))
-      completedQuadPolygonsRef.current = []
-    }
-  }, [completedQuadrants])
-
-  // Visualize progressive restaurant markers
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.google?.maps) return
-
-    // Clear previous progressive markers
-    progressiveMarkersRef.current.forEach(m => m.setMap(null))
-    progressiveMarkersRef.current = []
-
-    if (!progressiveRestaurants || progressiveRestaurants.length === 0) return
-
-    progressiveRestaurants.forEach((restaurant) => {
-      if (!restaurant.gps_coordinates?.latitude || !restaurant.gps_coordinates?.longitude) return
-
-      const position = {
-        lat: restaurant.gps_coordinates.latitude,
-        lng: restaurant.gps_coordinates.longitude
-      }
-
-      try {
-        if (window.google.maps.marker?.PinElement && window.google.maps.marker?.AdvancedMarkerElement) {
-          const pin = new window.google.maps.marker.PinElement({
-            background: "#22c55e",  // Green for mock/discovered
-            borderColor: "#16a34a",
-            glyphColor: "#FFFFFF",
-            scale: 0.9,
-          })
-
-          const marker = new window.google.maps.marker.AdvancedMarkerElement({
-            position: position,
-            map: mapInstanceRef.current,
-            title: restaurant.name,
-            content: pin.element,
-          })
-
-          progressiveMarkersRef.current.push(marker)
-        }
-      } catch (error) {
-        console.warn('Failed to create progressive marker:', error)
-      }
-    })
-
-    return () => {
-      progressiveMarkersRef.current.forEach(m => m.setMap(null))
-      progressiveMarkersRef.current = []
-    }
-  }, [progressiveRestaurants])
-
   return (
     <div className="w-full h-full rounded-lg overflow-hidden shadow-lg relative">
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} className="rounded-lg" />
@@ -929,11 +630,7 @@ export default function GoogleMapsEmbed({
   isLocked,
   centerOffset,
   restaurants,
-  showSubdivisions,
-  subdivisionDepth,
-  activeQuadrants,
-  completedQuadrants,
-  progressiveRestaurants,
+  zoom,
   onZoomChange,
   onBoundsChange,
   hoveredRestaurantId,
@@ -955,11 +652,7 @@ export default function GoogleMapsEmbed({
         isLocked={isLocked}
         centerOffset={centerOffset}
         restaurants={restaurants}
-        showSubdivisions={showSubdivisions}
-        subdivisionDepth={subdivisionDepth}
-        activeQuadrants={activeQuadrants}
-        completedQuadrants={completedQuadrants}
-        progressiveRestaurants={progressiveRestaurants}
+        zoom={zoom}
         onZoomChange={onZoomChange}
         onBoundsChange={onBoundsChange}
         hoveredRestaurantId={hoveredRestaurantId}

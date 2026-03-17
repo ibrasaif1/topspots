@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import GoogleMapsEmbed from "../components/GoogleMapsEmbed";
+import CategoryFilter from "@/components/CategoryFilter";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  type CategoryId,
+  CATEGORIES,
+  DEFAULT_SELECTED_CATEGORIES,
+  matchesAnyCategory,
+  getWidestFetchParams,
+} from "@/config/filters";
 
 type Restaurant = {
   place_id: string;
@@ -42,6 +50,7 @@ export default function Page() {
   const [zoom, setZoom] = useState<number>(4);
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [hoveredRestaurantId, setHoveredRestaurantId] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<CategoryId[]>(DEFAULT_SELECTED_CATEGORIES);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
   
@@ -66,7 +75,8 @@ export default function Page() {
         latitude >= bounds.south &&
         latitude <= bounds.north &&
         longitude >= bounds.west &&
-        longitude <= bounds.east
+        longitude <= bounds.east &&
+        matchesAnyCategory(restaurant.rating, restaurant.reviews, selectedCategories)
       );
     }).sort((a, b) => {
       // Sort by rating (descending), then by reviews (descending)
@@ -75,15 +85,21 @@ export default function Page() {
       }
       return b.reviews - a.reviews;
     });
-  }, [restaurants, zoom, bounds]);
+  }, [restaurants, zoom, bounds, selectedCategories]);
   
   const showRestaurantList = zoom >= ZOOM_THRESHOLD && visibleRestaurants.length > 0;
+
+  // Filter all restaurants by selected categories (for map markers)
+  const filteredRestaurants = useMemo(() => {
+    return restaurants.filter(r => matchesAnyCategory(r.rating, r.reviews, selectedCategories));
+  }, [restaurants, selectedCategories]);
 
   // Fetch restaurant data from backend API
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        const res = await fetch(`${apiUrl}/places?minRating=4.5&minReviews=1000`);
+        const { minRating, minReviews } = getWidestFetchParams(CATEGORIES);
+        const res = await fetch(`${apiUrl}/places?minRating=${minRating}&minReviews=${minReviews}`);
         
         if (!res.ok) {
           throw new Error(`API error: ${res.status}`);
@@ -189,11 +205,7 @@ export default function Page() {
         const data = await response.json();
         if (data.mock) setMockMode(true);
         // Convert backend response to Restaurant format
-        // Filter to only show places with 1000+ reviews (TopSpots criteria)
-        const MIN_REVIEWS = 1000;
-        
         const newRestaurants: Restaurant[] = (data.places || [])
-          .filter((place: { userRatingCount: number }) => place.userRatingCount >= MIN_REVIEWS)
           .map((place: {
             placeId: string;
             displayName: string;
@@ -215,8 +227,6 @@ export default function Page() {
               ? `$${place.priceMin} - $${place.priceMax}` 
               : ''
           }));
-        
-        console.log(`Filtered to ${newRestaurants.length} places with ${MIN_REVIEWS}+ reviews`);
         
         // Add to existing restaurants
         setRestaurants(prev => [...prev, ...newRestaurants]);
@@ -268,6 +278,16 @@ export default function Page() {
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Enter city or address..."
                 className="w-full px-4 py-2 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Categories
+              </label>
+              <CategoryFilter
+                selected={selectedCategories}
+                onChange={setSelectedCategories}
               />
             </div>
 
@@ -331,7 +351,7 @@ export default function Page() {
           onPolygonCleared={() => setClearPolygon(false)}
           isLocked={false}
           centerOffset={-7}
-          restaurants={restaurants}
+          restaurants={filteredRestaurants}
           zoom={zoom}
           onZoomChange={handleZoomChange}
           onBoundsChange={handleBoundsChange}
@@ -353,10 +373,12 @@ export default function Page() {
         {/* Panel Header */}
         <div className="p-4 border-b border-white/20">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            TopSpots in View
+            {selectedCategories.length === 1 && selectedCategories[0] === 'topspots'
+              ? 'TopSpots in View'
+              : 'Restaurants in View'}
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            {visibleRestaurants.length} restaurant{visibleRestaurants.length !== 1 ? 's' : ''} • 4.5★+ • 1000+ reviews
+            {visibleRestaurants.length} restaurant{visibleRestaurants.length !== 1 ? 's' : ''} • {CATEGORIES.filter(c => selectedCategories.includes(c.id)).map(c => c.label).join(', ')}
           </p>
         </div>
 

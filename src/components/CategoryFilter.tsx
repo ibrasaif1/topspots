@@ -8,15 +8,21 @@ interface CategoryFilterProps {
   onChange: (selected: CategoryId[]) => void;
 }
 
+// TODO: Switch to type="multiple" for inclusive multi-select (union logic already supported)
+// <ToggleGroup type="multiple" value={selected} onValueChange={(value: string[]) => {
+//   if (value.length === 0) return; // Prevent deselecting all
+//   onChange(value as CategoryId[]);
+// }}>
+
 export default function CategoryFilter({ selected, onChange }: CategoryFilterProps) {
   return (
     <ToggleGroup
-      type="multiple"
-      value={selected}
-      onValueChange={(value: string[]) => {
-        // Prevent deselecting all — at least one must remain
-        if (value.length === 0) return;
-        onChange(value as CategoryId[]);
+      type="single"
+      value={selected[0]}
+      onValueChange={(value: string) => {
+        // Prevent deselecting (clicking the active toggle)
+        if (!value) return;
+        onChange([value as CategoryId]);
       }}
       className="flex flex-wrap gap-2 justify-start"
     >

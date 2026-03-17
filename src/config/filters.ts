@@ -20,7 +20,7 @@ export interface CategoryConfig {
 export const CATEGORIES: CategoryConfig[] = [
   { id: 'topspots', label: 'TopSpots', description: '4.5★+ • 1000+ reviews', minRating: 4.5, minReviews: 1000 },
   { id: 'hidden-gems', label: 'Hidden Gems', description: '4.8★+ • 800-999 reviews', minRating: 4.8, minReviews: 800, maxReviews: 999 },
-  { id: 'on-the-come-up', label: 'On The Come Up', description: '4.5★+ • 800-999 reviews', minRating: 4.5, minReviews: 800, maxReviews: 999 },
+  { id: 'on-the-come-up', label: 'On The Come Up', description: '4.5★+ • <800 reviews', minRating: 4.5, minReviews: 0, maxReviews: 799 },
 ];
 
 export const DEFAULT_SELECTED_CATEGORIES: CategoryId[] = ['topspots'];

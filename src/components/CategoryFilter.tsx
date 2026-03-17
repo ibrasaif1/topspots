@@ -24,7 +24,7 @@ export default function CategoryFilter({ selected, onChange }: CategoryFilterPro
         if (!value) return;
         onChange([value as CategoryId]);
       }}
-      className="flex flex-wrap gap-2 justify-start"
+      className="flex flex-col gap-2 w-full"
     >
       {CATEGORIES.map((cat) => (
         <ToggleGroupItem
@@ -32,7 +32,7 @@ export default function CategoryFilter({ selected, onChange }: CategoryFilterPro
           value={cat.id}
           aria-label={cat.label}
           title={cat.description}
-          className="rounded-full px-3 py-1 text-xs font-medium border border-slate-300 data-[state=on]:bg-slate-900 data-[state=on]:text-white data-[state=on]:border-slate-900 hover:bg-slate-100"
+          className="w-full rounded-lg px-3 py-2 text-xs font-medium cursor-pointer border border-slate-300 bg-slate-100 data-[state=on]:bg-slate-900 data-[state=on]:text-white data-[state=on]:border-slate-900 hover:bg-slate-200"
         >
           {cat.label}
         </ToggleGroupItem>

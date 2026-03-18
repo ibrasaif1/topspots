@@ -5,6 +5,61 @@ import { Wrapper } from '@googlemaps/react-wrapper'
 import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer'
 import type { Renderer } from '@googlemaps/markerclusterer'
 import { isCounterClockwise } from '@/lib/utils'
+import type { CategoryId } from '@/config/filters'
+
+// SVG paths for category icons (exact Lucide paths)
+const CATEGORY_ICON_SVGS: Record<CategoryId, string> = {
+  topspots: `<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" fill="currentColor"/>`,
+  'hidden-gems': `<path d="M10.5 3 8 9l4 13 4-13-2.5-6" fill="currentColor" opacity="0.3"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z" fill="currentColor"/><path d="M2 9h20" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.3"/>`,
+  'on-the-come-up': `<path d="M16 7h6v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m22 7-8.5 8.5-5-5L2 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
+}
+
+function isDarkMode(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+function getMarkerColors(highlighted: boolean) {
+  const dark = isDarkMode()
+  if (highlighted) {
+    return dark
+      ? { bg: '#3b82f6', border: '#2563eb', text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+      : { bg: 'rgba(59,130,246,0.75)', border: 'rgba(59,130,246,0.5)', text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+  }
+  return dark
+    ? { bg: '#18181b', border: '#27272a', text: '#fafafa', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+    : { bg: 'rgba(255,255,255,0.65)', border: 'rgba(255,255,255,0.5)', text: '#18181b', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+}
+
+function getCategoryForRestaurant(rating: number, reviews: number): CategoryId {
+  if (rating >= 4.8 && reviews >= 500 && reviews <= 999) return 'hidden-gems'
+  if (rating >= 4.5 && reviews >= 1000) return 'topspots'
+  return 'on-the-come-up'
+}
+
+function createCategoryMarkerElement(category: CategoryId, highlighted = false): HTMLDivElement {
+  const dark = isDarkMode()
+  const colors = getMarkerColors(highlighted)
+  const size = highlighted ? 38 : 34
+  const div = document.createElement('div')
+  div.style.cssText = `
+    width: ${size}px;
+    height: ${size}px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: ${colors.bg};
+    ${dark ? '' : 'backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);'}
+    border: 1px solid ${colors.border};
+    box-shadow: ${colors.shadow}${colors.innerHighlight};
+    color: ${colors.text};
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+  `
+  div.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${highlighted ? 18 : 16}" height="${highlighted ? 18 : 16}" viewBox="0 0 24 24" fill="none" stroke="none" style="color: ${colors.text}">${CATEGORY_ICON_SVGS[category]}</svg>`
+  return div
+}
 
 type Bounds = { north: number; south: number; east: number; west: number }
 
@@ -79,6 +134,7 @@ function GoogleMapComponent({
     showInfoWindow: () => void
     hideInfoWindow: () => void
     googleMapsUrl: string
+    category: CategoryId
   }>>(new Map())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null)
@@ -88,6 +144,15 @@ function GoogleMapComponent({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const polygonRef = useRef<any>(null)
   useEffect(() => { zoomRef.current = zoom ?? 0 }, [zoom])
+  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => setColorScheme(e.matches ? 'dark' : 'light')
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<{lat: number, lng: number}[]>([])
 
@@ -133,15 +198,31 @@ function GoogleMapComponent({
 
   // Create marker HTML element
   const createMarkerElement = useCallback((number: number) => {
+    const dark = isDarkMode()
     const div = document.createElement('div')
-    div.innerHTML = `
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="16" cy="16" r="12" fill="${isLocked ? '#10b981' : '#EF4444'}" stroke="white" stroke-width="3"/>
-        <text x="16" y="21" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${number}</text>
-      </svg>
-    `
+    if (dark) {
+      div.style.cssText = `
+        width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+        border-radius: 9999px; background: ${isLocked ? '#10b981' : '#18181b'};
+        border: 1px solid ${isLocked ? '#059669' : '#27272a'};
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        color: ${isLocked ? '#ffffff' : '#fafafa'}; font-size: 13px; font-weight: 600;
+        user-select: none;
+      `
+    } else {
+      div.style.cssText = `
+        width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+        border-radius: 9999px; background: ${isLocked ? 'rgba(16,185,129,0.75)' : 'rgba(255,255,255,0.65)'};
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid ${isLocked ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.5)'};
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
+        color: ${isLocked ? '#ffffff' : '#18181b'}; font-size: 13px; font-weight: 600;
+        user-select: none;
+      `
+    }
+    div.textContent = String(number)
     return div
-  }, [isLocked])
+  }, [isLocked, colorScheme])
 
   // Rebuild markers with correct numbering
   const rebuildMarkers = useCallback((points: {lat: number, lng: number}[]) => {
@@ -414,6 +495,13 @@ function GoogleMapComponent({
     }
   }, [isLocked, polygonPoints, rebuildMarkers])
 
+  // Rebuild polygon point markers when color scheme changes
+  useEffect(() => {
+    if (polygonPoints.length > 0 && mapInstanceRef.current) {
+      rebuildMarkers(polygonPoints)
+    }
+  }, [colorScheme, rebuildMarkers, polygonPoints])
+
   // Handle clear polygon
   useEffect(() => {
     if (clearPolygon) {
@@ -466,18 +554,14 @@ function GoogleMapComponent({
         lng: restaurant.gps_coordinates.longitude
       }
 
-      const pin = new window.google.maps.marker.PinElement({
-        background: "#EF4444",
-        borderColor: "#DC2626",
-        glyphColor: "#FFFFFF",
-        scale: 1,
-      })
+      const category = getCategoryForRestaurant(restaurant.rating, restaurant.reviews)
+      const markerEl = createCategoryMarkerElement(category)
 
       // Don't set map — the clusterer manages map attachment
       const marker = new window.google.maps.marker.AdvancedMarkerElement({
         position: position,
         title: restaurant.name,
-        content: pin.element,
+        content: markerEl,
       })
 
       // Build info window content
@@ -501,7 +585,7 @@ function GoogleMapComponent({
             ${escapeHtml(restaurant.name)}
           </div>
 
-          ${restaurant.rating ? `<div style="color: #059669; margin: 0 0 4px 0; font-size: 13px; font-weight: 500;">⭐ ${restaurant.rating.toFixed(1)} · ${(Math.floor((restaurant.reviews ?? 0) / 100) * 100).toLocaleString()}+ reviews</div>` : ""}
+          ${restaurant.rating ? `<div style="color: #059669; margin: 0 0 4px 0; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 3px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>${restaurant.rating.toFixed(1)} · ${(Math.floor((restaurant.reviews ?? 0) / 100) * 100).toLocaleString()}+ reviews</div>` : ""}
 
           ${detailParts.length ? `<div style="color: #6b7280; font-size: 12px; margin: 0;">${detailParts.join(" · ")}</div>` : ""}
         </div>
@@ -574,26 +658,81 @@ function GoogleMapComponent({
         showInfoWindow,
         hideInfoWindow,
         googleMapsUrl,
+        category,
       })
 
       restaurantMarkersRef.current.set(restaurant.place_id, marker)
       allMarkers.push(marker)
     })
 
-    // Custom cluster renderer — red circles matching the app's pin style
+    // Custom cluster renderer — adapts to light/dark mode
+    const dark = isDarkMode()
     const clusterRenderer: Renderer = {
       render({ count, position }) {
-        const size = Math.min(60, 36 + Math.log2(count) * 6)
-        const svg = `
-          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="#EF4444" stroke="white" stroke-width="3" opacity="0.9"/>
-            <text x="${size / 2}" y="${size / 2 + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${count}</text>
-          </svg>
-        `
+        const size = Math.min(54, 34 + Math.log2(count) * 5)
         const div = document.createElement('div')
-        div.innerHTML = svg
-        div.style.cursor = 'pointer'
-        div.style.transform = `translateY(${size / 2}px)`
+
+        if (dark) {
+          div.style.cssText = `
+            width: ${size}px;
+            height: ${size}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: #18181b;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            border: 1px solid #27272a;
+            color: #fafafa;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            cursor: pointer;
+            transform: translateY(${size / 2}px);
+            transition: background 0.15s ease, border-color 0.15s ease;
+            user-select: none;
+          `
+          div.addEventListener('mouseenter', () => {
+            div.style.background = '#27272a'
+            div.style.borderColor = '#3f3f46'
+          })
+          div.addEventListener('mouseleave', () => {
+            div.style.background = '#18181b'
+            div.style.borderColor = '#27272a'
+          })
+        } else {
+          div.style.cssText = `
+            width: ${size}px;
+            height: ${size}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: #18181b;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            cursor: pointer;
+            transform: translateY(${size / 2}px);
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            user-select: none;
+          `
+          div.addEventListener('mouseenter', () => {
+            div.style.background = 'rgba(255,255,255,0.8)'
+            div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)'
+          })
+          div.addEventListener('mouseleave', () => {
+            div.style.background = 'rgba(255,255,255,0.65)'
+            div.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4)'
+          })
+        }
+
+        div.textContent = String(count)
 
         return new window.google.maps.marker.AdvancedMarkerElement({
           position,
@@ -645,51 +784,32 @@ function GoogleMapComponent({
       }
       isHoveringInfoWindowRef.current = false
     }
-  }, [restaurants])
+  }, [restaurants, colorScheme])
 
   // Handle marker highlighting when hoveredRestaurantId changes
   useEffect(() => {
-    if (!window.google?.maps?.marker?.PinElement) return
+    if (!window.google?.maps) return
 
     restaurantMarkersRef.current.forEach((marker, placeId) => {
       const isHovered = placeId === hoveredRestaurantId
+      const eventData = markerEventDataRef.current.get(placeId)
+      if (!eventData) return
 
       try {
-        if (marker.content) {
-          if (isHovered) {
-            const highlightedPin = new window.google.maps.marker.PinElement({
-              background: "#3B82F6",
-              borderColor: "#2563EB",
-              glyphColor: "#FFFFFF",
-              scale: 1.3,
-            })
-            marker.content = highlightedPin.element
-            marker.zIndex = 1000
-          } else {
-            const normalPin = new window.google.maps.marker.PinElement({
-              background: "#EF4444",
-              borderColor: "#DC2626",
-              glyphColor: "#FFFFFF",
-              scale: 1,
-            })
-            marker.content = normalPin.element
-            marker.zIndex = 1
-          }
+        const newContent = createCategoryMarkerElement(eventData.category, isHovered)
+        marker.content = newContent
+        marker.zIndex = isHovered ? 1000 : 1
 
-          // Re-attach event listeners since content was replaced
-          const eventData = markerEventDataRef.current.get(placeId)
-          if (eventData) {
-            const el = marker.content as HTMLElement | null
-            if (el) {
-              el.addEventListener('mouseenter', eventData.showInfoWindow)
-              el.addEventListener('mouseleave', eventData.hideInfoWindow)
-              el.addEventListener('click', (e: Event) => {
-                e.stopPropagation()
-                window.open(eventData.googleMapsUrl, '_blank')
-              })
-              el.style.cursor = 'pointer'
-            }
-          }
+        // Re-attach event listeners since content was replaced
+        const el = marker.content as HTMLElement | null
+        if (el) {
+          el.addEventListener('mouseenter', eventData.showInfoWindow)
+          el.addEventListener('mouseleave', eventData.hideInfoWindow)
+          el.addEventListener('click', (e: Event) => {
+            e.stopPropagation()
+            window.open(eventData.googleMapsUrl, '_blank')
+          })
+          el.style.cursor = 'pointer'
         }
       } catch (error) {
         console.warn('Failed to update marker highlight:', error)

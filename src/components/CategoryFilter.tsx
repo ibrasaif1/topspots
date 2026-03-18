@@ -2,6 +2,13 @@
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CATEGORIES, type CategoryId } from "@/config/filters";
+import { Star, Gem, TrendingUp } from "lucide-react";
+
+const CATEGORY_ICONS: Record<CategoryId, React.ReactNode> = {
+  topspots: <Star className="size-3.5" />,
+  "hidden-gems": <Gem className="size-3.5" />,
+  "on-the-come-up": <TrendingUp className="size-3.5" />,
+};
 
 interface CategoryFilterProps {
   selected: CategoryId[];
@@ -32,9 +39,9 @@ export default function CategoryFilter({ selected, onChange }: CategoryFilterPro
           value={cat.id}
           aria-label={cat.label}
           title={cat.description}
-          className="flex-1 rounded-full px-3 py-2 text-xs font-medium cursor-pointer transition-all duration-150 border border-slate-300 bg-slate-100 shadow-[0_3px_0_0_#94a3b8] hover:-translate-y-0.5 hover:shadow-[0_4px_0_0_#94a3b8] active:translate-y-0.5 active:shadow-[0_1px_0_0_#94a3b8] data-[state=on]:translate-y-0.5 data-[state=on]:shadow-[0_1px_0_0_#1e293b] data-[state=on]:bg-slate-900 data-[state=on]:text-white data-[state=on]:border-slate-900"
+          className="flex-1 rounded-full px-3 py-2 text-xs font-medium cursor-pointer transition-transform duration-200 ease-out border border-slate-300 bg-slate-100 shadow-[0_3px_0_0_#94a3b8] hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-[0_1px_0_0_#94a3b8] data-[state=on]:translate-y-0.5 data-[state=on]:shadow-[0_1px_0_0_#1e293b] data-[state=on]:bg-slate-900 data-[state=on]:text-white data-[state=on]:border-slate-900"
         >
-          {cat.label}
+          {CATEGORY_ICONS[cat.id]} {cat.label}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

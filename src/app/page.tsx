@@ -18,6 +18,7 @@ import {
   matchesAnyCategory,
   getWidestFetchParams,
 } from "@/config/filters";
+import { Star } from "lucide-react";
 
 type Restaurant = {
   place_id: string;
@@ -250,7 +251,7 @@ export default function Page() {
         </div>
       )}
       <div className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 w-1/3 p-8 bg-white/10 dark:bg-black/10 backdrop-blur-xl border-r border-white/20 z-10 flex items-center justify-center`}>
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-6xl font-bold text-slate-900">
               TopSpots
@@ -281,15 +282,10 @@ export default function Page() {
               />
             </div>
 
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Categories
-              </label>
-              <CategoryFilter
-                selected={selectedCategories}
-                onChange={setSelectedCategories}
-              />
-            </div>
+            <CategoryFilter
+              selected={selectedCategories}
+              onChange={setSelectedCategories}
+            />
 
             {location && (
               <div className={`p-4 border rounded-lg ${
@@ -415,13 +411,13 @@ export default function Page() {
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-sm">
-                      <span className="text-amber-500">⭐</span>
+                      <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                       <span className="font-medium text-slate-900 dark:text-white">
                         {restaurant.rating.toFixed(1)}
                       </span>
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      {restaurant.reviews.toLocaleString()} reviews
+                      {(Math.floor(restaurant.reviews / 100) * 100).toLocaleString()}+ reviews
                     </div>
                   </div>
                   

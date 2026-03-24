@@ -21,8 +21,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #09090b;
+    --foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #09090b;
+    --ring: #a1a1aa;
+  }
+
+  /* Refined dark scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(113, 113, 122, 0.25) transparent;
+  }
+
+  /* Google Maps InfoWindow dark surface */
+  .gm-style-iw-c {
+    background: #1c1c1f !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(63,63,70,0.4) !important;
+  }
+  .gm-style-iw-tc::after {
+    background: #1c1c1f !important;
+  }
+  .gm-style .gm-style-iw-d {
+    color: #fafafa !important;
   }
 }
 

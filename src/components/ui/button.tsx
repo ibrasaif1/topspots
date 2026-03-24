@@ -9,11 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_3px_0_0_#1e293b] hover:shadow-[0_4px_0_0_#1e293b] active:shadow-[0_1px_0_0_#1e293b]",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_3px_0_0_#1e293b] hover:shadow-[0_4px_0_0_#1e293b] active:shadow-[0_1px_0_0_#1e293b] dark:shadow-[0_3px_0_0_#a1a1aa] dark:hover:shadow-[0_4px_0_0_#a1a1aa] dark:active:shadow-[0_1px_0_0_#a1a1aa]",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[0_3px_0_0_#991b1b] hover:shadow-[0_4px_0_0_#991b1b] active:shadow-[0_1px_0_0_#991b1b]",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-[0_3px_0_0_#94a3b8] hover:shadow-[0_4px_0_0_#94a3b8] active:shadow-[0_1px_0_0_#94a3b8]",
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-[0_3px_0_0_#94a3b8] hover:shadow-[0_4px_0_0_#94a3b8] active:shadow-[0_1px_0_0_#94a3b8] dark:border-zinc-600 dark:shadow-[0_3px_0_0_#27272a] dark:hover:shadow-[0_4px_0_0_#27272a] dark:active:shadow-[0_1px_0_0_#27272a]",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-[0_3px_0_0_#94a3b8] hover:shadow-[0_4px_0_0_#94a3b8] active:shadow-[0_1px_0_0_#94a3b8]",
         ghost: "hover:bg-accent hover:text-accent-foreground",

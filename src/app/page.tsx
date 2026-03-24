@@ -244,33 +244,33 @@ export default function Page() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 relative overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-zinc-950 relative overflow-hidden">
       {mockMode && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-amber-400 text-amber-900 text-xs font-semibold text-center py-1">
           MOCK MODE — Data is simulated
         </div>
       )}
-      <div className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 w-1/3 p-8 bg-white/10 dark:bg-black/10 backdrop-blur-xl border-r border-white/20 z-10 flex items-center justify-center`}>
+      <div className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 w-1/3 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
         <div className="w-full max-w-lg">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-6xl font-bold text-slate-900">
+            <h1 className="text-6xl font-bold text-slate-900 dark:text-white">
               TopSpots
             </h1>
             <button
               onClick={() => setHelpOpen(true)}
-              className="w-8 h-8 rounded-full border-2 border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 flex items-center justify-center text-lg font-semibold transition-colors"
+              className="w-8 h-8 rounded-full border-2 border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center text-lg font-semibold transition-colors"
               aria-label="Help"
             >
               ?
             </button>
           </div>
-          <div className="text-m text-slate-700 mb-4">
+          <div className="text-m text-slate-700 dark:text-zinc-400 mb-4">
             Zoom in or search for an area to conduct your own search
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
+              <label className="text-sm font-medium text-slate-700 dark:text-zinc-400 mb-2 block">
                 Search Location
               </label>
               <input
@@ -278,7 +278,7 @@ export default function Page() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Enter city or address..."
-                className="w-full px-4 py-2 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900"
+                className="w-full px-4 py-2 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 dark:bg-zinc-800/60 dark:border-zinc-600 dark:text-white dark:placeholder-zinc-500"
               />
             </div>
 
@@ -290,23 +290,23 @@ export default function Page() {
             {location && (
               <div className={`p-4 border rounded-lg ${
                 polygon.length === 4 && isPolygonValid
-                  ? 'bg-green-50 border-green-200'
+                  ? 'bg-green-50 border-green-200 dark:bg-emerald-950/40 dark:border-emerald-800/50'
                   : polygon.length === 4 && !isPolygonValid
-                  ? 'bg-orange-50 border-orange-300'
-                  : 'bg-blue-50 border-blue-200'
+                  ? 'bg-orange-50 border-orange-300 dark:bg-orange-950/40 dark:border-orange-800/50'
+                  : 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/50'
               }`}>
-                <p className="text-sm text-slate-700 mb-1">
+                <p className="text-sm text-slate-700 dark:text-zinc-300 mb-1">
                   Click <span className="font-semibold">4 points</span> on the map
                 </p>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 dark:text-zinc-400">
                   Points selected: <span className="font-semibold">{polygon.length}/4</span>
                 </p>
               </div>
             )}
 
             {polygon.length === 4 && !isPolygonValid && (
-              <div className="p-4 bg-orange-50 border border-orange-300 rounded-lg">
-                <p className="text-sm text-orange-700 font-medium">
+              <div className="p-4 bg-orange-50 border border-orange-300 dark:bg-orange-950/40 dark:border-orange-800/50 rounded-lg">
+                <p className="text-sm text-orange-700 dark:text-orange-400 font-medium">
                   ⚠️ Polygon must be drawn counter-clockwise
                 </p>
               </div>
@@ -358,16 +358,16 @@ export default function Page() {
       {/* Restaurant List Panel - appears when zoomed in */}
       <div 
         className={`
-          absolute right-0 top-0 bottom-0 w-1/6 
-          bg-white/10 dark:bg-black/10 backdrop-blur-xl
-          border-l border-white/20
+          absolute right-0 top-0 bottom-0 w-1/6
+          bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl
+          border-l border-white/20 dark:border-zinc-700/40
           transition-transform duration-300 ease-out
           ${showRestaurantList ? 'translate-x-0' : 'translate-x-full'}
           z-20 flex flex-col
         `}
       >
         {/* Panel Header */}
-        <div className="p-4 border-b border-white/20">
+        <div className="p-4 border-b border-white/20 dark:border-zinc-700/40">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
             {selectedCategories.length === 1 && selectedCategories[0] === 'topspots'
               ? 'TopSpots in View'
@@ -392,9 +392,9 @@ export default function Page() {
                   className={`
                     p-3 rounded-lg border cursor-pointer
                     transition-all duration-150 ease-out
-                    ${isHovered 
-                      ? 'bg-white/40 border-white/60 shadow-md dark:bg-white/20' 
-                      : 'bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50 dark:bg-white/10 dark:border-white/20'
+                    ${isHovered
+                      ? 'bg-white/40 border-white/60 shadow-md dark:bg-zinc-700/60 dark:border-zinc-500/60 dark:shadow-lg dark:shadow-black/30'
+                      : 'bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50 dark:bg-zinc-800/40 dark:border-zinc-700/40 dark:hover:bg-zinc-700/50 dark:hover:border-zinc-600/50'
                     }
                   `}
                   onMouseEnter={() => setHoveredRestaurantId(restaurant.place_id)}
@@ -445,18 +445,18 @@ export default function Page() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className={`p-4 border rounded-lg ${mockMode ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
-              <p className="text-2xl font-bold text-slate-900 text-center">
+            <div className={`p-4 border rounded-lg ${mockMode ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/50' : 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/50'}`}>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white text-center">
                 {placeCount !== null ? placeCount : '—'}
               </p>
-              <p className="text-sm text-slate-600 text-center mt-1">
+              <p className="text-sm text-slate-600 dark:text-zinc-400 text-center mt-1">
                 places found in this area
               </p>
 
               {placeCount !== null && placeCount > 0 && !mockMode && (
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <div className="flex flex-col items-center">
-                    <p className="text-lg font-semibold text-slate-800">
+                    <p className="text-lg font-semibold text-slate-800 dark:text-zinc-200">
                       ${((placeCount * 0.02) * 1.029 + 0.30).toFixed(2)}
                     </p>
                     <p className="text-xs text-slate-500 text-center mt-1">cost</p>

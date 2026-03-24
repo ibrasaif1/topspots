@@ -161,22 +161,29 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
   const mapInstanceRef = useRef<GoogleMapsMap | null>(null);
   const markersRef = useRef<{ [key: string]: GoogleMapsAdvancedMarkerElement | GoogleMapsLegacyMarker }>({});
   const infoWindowRef = useRef<GoogleMapsInfoWindow | null>(null);
+  const [mapColorScheme, setMapColorScheme] = useState<'light' | 'dark'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setMapColorScheme(e.matches ? 'dark' : 'light');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || !window.google?.maps) return;
 
-
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: 30.2672, lng: -97.7431 },
       zoom: 12,
-      mapId: "2ddce5326308b2176661a3da", // Custom Map ID for Advanced Markers
-      // Disable various controls
-      streetViewControl: false,        // Removes Street View pegman
-      fullscreenControl: false,        // Removes fullscreen button
-      mapTypeControl: false,           // Removes Map/Satellite toggle
-      zoomControl: true,               // Keep zoom controls
-      gestureHandling: 'cooperative',  // Requires Ctrl+scroll to zoom
-      // Note: styles removed - when mapId is present, styles are controlled via Google Cloud Console
+      mapId: "2ddce5326308b2176661a3da",
+      streetViewControl: false,
+      fullscreenControl: false,
+      mapTypeControl: false,
+      zoomControl: true,
+      gestureHandling: 'cooperative',
+      colorScheme: mapColorScheme === 'dark' ? 'DARK' : 'LIGHT',
     });
 
     mapInstanceRef.current = map;
@@ -391,8 +398,9 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
         infoWindowRef.current.close();
         infoWindowRef.current = null;
       }
+      mapInstanceRef.current = null;
     };
-  }, [restaurants, onMarkerHover, city]);
+  }, [restaurants, onMarkerHover, city, mapColorScheme]);
 
   // Handle marker highlighting when hovering over restaurant list
   useEffect(() => {

@@ -22,12 +22,12 @@ function getMarkerColors(highlighted: boolean) {
   const dark = isDarkMode()
   if (highlighted) {
     return dark
-      ? { bg: '#3b82f6', border: '#2563eb', text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
-      : { bg: 'rgba(59,130,246,0.75)', border: 'rgba(59,130,246,0.5)', text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+      ? { bg: '#3b82f6', border: 'rgba(255,255,255,0.5)', text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+      : { bg: 'rgba(59,130,246,0.75)', border: 'rgba(0,0,0,0.3)', text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
   }
   return dark
-    ? { bg: '#18181b', border: '#27272a', text: '#fafafa', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
-    : { bg: 'rgba(255,255,255,0.65)', border: 'rgba(255,255,255,0.5)', text: '#18181b', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+    ? { bg: '#18181b', border: 'rgba(255,255,255,0.5)', text: '#fafafa', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+    : { bg: 'rgba(255,255,255,0.65)', border: 'rgba(0,0,0,0.3)', text: '#18181b', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
 }
 
 function getCategoryForRestaurant(rating: number, reviews: number): CategoryId {
@@ -140,6 +140,7 @@ function GoogleMapComponent({
   const infoWindowRef = useRef<any>(null)
   const infoWindowCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isHoveringInfoWindowRef = useRef<boolean>(false)
+  const sidebarHoverActiveRef = useRef<boolean>(false)
   const zoomRef = useRef<number>(zoom ?? 0)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const polygonRef = useRef<any>(null)
@@ -204,7 +205,7 @@ function GoogleMapComponent({
       div.style.cssText = `
         width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
         border-radius: 9999px; background: ${isLocked ? '#10b981' : '#18181b'};
-        border: 1px solid ${isLocked ? '#059669' : '#27272a'};
+        border: 1px solid ${isLocked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.5)'};
         box-shadow: 0 1px 3px rgba(0,0,0,0.12);
         color: ${isLocked ? '#ffffff' : '#fafafa'}; font-size: 13px; font-weight: 600;
         user-select: none;
@@ -214,7 +215,7 @@ function GoogleMapComponent({
         width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
         border-radius: 9999px; background: ${isLocked ? 'rgba(16,185,129,0.75)' : 'rgba(255,255,255,0.65)'};
         backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        border: 1px solid ${isLocked ? 'rgba(16,185,129,0.5)' : 'rgba(255,255,255,0.5)'};
+        border: 1px solid ${isLocked ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.3)'};
         box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
         color: ${isLocked ? '#ffffff' : '#18181b'}; font-size: 13px; font-weight: 600;
         user-select: none;
@@ -327,19 +328,24 @@ function GoogleMapComponent({
     })
   }, [isLocked, onPolygonChange, onPolygonValidation, createMarkerElement, getPolygonColors])
 
-  // Initialize map
+  // Initialize map — recreates when color scheme changes
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps || mapInstanceRef.current) return
+    if (!mapRef.current || !window.google?.maps) return
+
+    // Preserve center/zoom if map already exists
+    const prevCenter = mapInstanceRef.current?.getCenter()
+    const prevZoom = mapInstanceRef.current?.getZoom()
 
     const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 35, lng: 240 },
-      zoom: 4,
+      center: prevCenter ?? { lat: 35, lng: 240 },
+      zoom: prevZoom ?? 4,
       minZoom: 3,
       disableDefaultUI: true,
       gestureHandling: 'cooperative',
       mapId: "2ddce5326308b2176661a3da",
+      colorScheme: colorScheme === 'dark' ? 'DARK' : 'LIGHT',
     })
-  
+
     mapInstanceRef.current = map
 
     // Debounce helper for bounds changes
@@ -457,8 +463,9 @@ function GoogleMapComponent({
         polygonRef.current.setMap(null)
         polygonRef.current = null
       }
+      mapInstanceRef.current = null
     }
-  }, [isLocked, onPolygonChange, onPolygonValidation, rebuildMarkers, getPolygonColors, onZoomChange, onBoundsChange])
+  }, [colorScheme, isLocked, onPolygonChange, onPolygonValidation, rebuildMarkers, getPolygonColors, onZoomChange, onBoundsChange])
   
   // Separate effect to update center when coordinates change
   useEffect(() => {
@@ -572,6 +579,11 @@ function GoogleMapComponent({
       const cleanPlaceId = restaurant.place_id.replace('places/', '')
       const googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${cleanPlaceId}`
 
+      const iwDark = colorScheme === 'dark'
+      const iwNameColor = iwDark ? '#fafafa' : '#111827'
+      const iwRatingColor = iwDark ? '#34d399' : '#059669'
+      const iwDetailColor = iwDark ? '#a1a1aa' : '#6b7280'
+
       const content = `
         <div style="
           padding: 0;
@@ -581,13 +593,13 @@ function GoogleMapComponent({
           line-height: 1.3;
           cursor: pointer;
         " onclick="window.open('${googleMapsUrl}', '_blank')">
-          <div style="font-weight: 600; font-size: 15px; color: #111827; margin: 0 0 6px 0;">
+          <div style="font-weight: 600; font-size: 15px; color: ${iwNameColor}; margin: 0 0 6px 0;">
             ${escapeHtml(restaurant.name)}
           </div>
 
-          ${restaurant.rating ? `<div style="color: #059669; margin: 0 0 4px 0; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 3px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>${restaurant.rating.toFixed(1)} · ${(Math.floor((restaurant.reviews ?? 0) / 100) * 100).toLocaleString()}+ reviews</div>` : ""}
+          ${restaurant.rating ? `<div style="color: ${iwRatingColor}; margin: 0 0 4px 0; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 3px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>${restaurant.rating.toFixed(1)} · ${(Math.floor((restaurant.reviews ?? 0) / 100) * 100).toLocaleString()}+ reviews</div>` : ""}
 
-          ${detailParts.length ? `<div style="color: #6b7280; font-size: 12px; margin: 0;">${detailParts.join(" · ")}</div>` : ""}
+          ${detailParts.length ? `<div style="color: ${iwDetailColor}; font-size: 12px; margin: 0;">${detailParts.join(" · ")}</div>` : ""}
         </div>
       `
 
@@ -626,11 +638,13 @@ function GoogleMapComponent({
       }
 
       const scheduleCloseInfoWindow = () => {
+        // Don't close while sidebar hover is active
+        if (sidebarHoverActiveRef.current) return
         // Only schedule close if not already scheduled
         if (infoWindowCloseTimeoutRef.current) return
 
         infoWindowCloseTimeoutRef.current = setTimeout(() => {
-          if (!isHoveringInfoWindowRef.current && infoWindowRef.current) {
+          if (!isHoveringInfoWindowRef.current && !sidebarHoverActiveRef.current && infoWindowRef.current) {
             infoWindowRef.current.close()
           }
           infoWindowCloseTimeoutRef.current = null
@@ -682,7 +696,7 @@ function GoogleMapComponent({
             border-radius: 9999px;
             background: #18181b;
             box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-            border: 1px solid #27272a;
+            border: 1px solid rgba(255,255,255,0.5);
             color: #fafafa;
             font-size: 13px;
             font-weight: 500;
@@ -694,11 +708,11 @@ function GoogleMapComponent({
           `
           div.addEventListener('mouseenter', () => {
             div.style.background = '#27272a'
-            div.style.borderColor = '#3f3f46'
+            div.style.borderColor = 'rgba(255,255,255,0.6)'
           })
           div.addEventListener('mouseleave', () => {
             div.style.background = '#18181b'
-            div.style.borderColor = '#27272a'
+            div.style.borderColor = 'rgba(255,255,255,0.5)'
           })
         } else {
           div.style.cssText = `
@@ -712,7 +726,7 @@ function GoogleMapComponent({
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
-            border: 1px solid rgba(255,255,255,0.5);
+            border: 1px solid rgba(0,0,0,0.3);
             color: #18181b;
             font-size: 13px;
             font-weight: 600;
@@ -750,17 +764,14 @@ function GoogleMapComponent({
       renderer: clusterRenderer,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onClusterClick: (_: any, cluster: any, map: any) => {
-        const pos = cluster.position
-        if (!pos) return
-        const currentZoom = map.getZoom() ?? 4
-        // Zoom in by 2 levels instead of fitting tightly
-        const targetZoom = Math.min(currentZoom + 2, 15)
-        // Shift center to the right to account for left sidebar overlay
-        const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng
-        const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat
-        const offsetLng = lng + 0.02 / Math.pow(2, targetZoom - 10)
-        map.setZoom(targetZoom)
-        map.panTo({ lat, lng: offsetLng })
+        const markers = cluster.markers
+        if (!markers || markers.length === 0) return
+        const bounds = new window.google.maps.LatLngBounds()
+        for (const marker of markers) {
+          const pos = marker.position
+          if (pos) bounds.extend(pos)
+        }
+        map.fitBounds(bounds, { left: 420, top: 50, right: 50, bottom: 50 })
       },
     })
 
@@ -790,6 +801,8 @@ function GoogleMapComponent({
   useEffect(() => {
     if (!window.google?.maps) return
 
+    sidebarHoverActiveRef.current = !!hoveredRestaurantId
+
     restaurantMarkersRef.current.forEach((marker, placeId) => {
       const isHovered = placeId === hoveredRestaurantId
       const eventData = markerEventDataRef.current.get(placeId)
@@ -799,6 +812,13 @@ function GoogleMapComponent({
         const newContent = createCategoryMarkerElement(eventData.category, isHovered)
         marker.content = newContent
         marker.zIndex = isHovered ? 1000 : 1
+
+        // Show/hide info window when hovered from sidebar
+        if (isHovered) {
+          eventData.showInfoWindow()
+        } else {
+          eventData.hideInfoWindow()
+        }
 
         // Re-attach event listeners since content was replaced
         const el = marker.content as HTMLElement | null

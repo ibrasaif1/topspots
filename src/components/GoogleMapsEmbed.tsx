@@ -328,17 +328,13 @@ function GoogleMapComponent({
     })
   }, [isLocked, onPolygonChange, onPolygonValidation, createMarkerElement, getPolygonColors])
 
-  // Initialize map — recreates when color scheme changes
+  // Initialize map once
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps) return
-
-    // Preserve center/zoom if map already exists
-    const prevCenter = mapInstanceRef.current?.getCenter()
-    const prevZoom = mapInstanceRef.current?.getZoom()
+    if (!mapRef.current || !window.google?.maps || mapInstanceRef.current) return
 
     const map = new window.google.maps.Map(mapRef.current, {
-      center: prevCenter ?? { lat: 35, lng: 240 },
-      zoom: prevZoom ?? 4,
+      center: { lat: 35, lng: 240 },
+      zoom: 4,
       minZoom: 3,
       disableDefaultUI: true,
       gestureHandling: 'cooperative',
@@ -465,7 +461,17 @@ function GoogleMapComponent({
       }
       mapInstanceRef.current = null
     }
-  }, [colorScheme, isLocked, onPolygonChange, onPolygonValidation, rebuildMarkers, getPolygonColors, onZoomChange, onBoundsChange])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLocked, onPolygonChange, onPolygonValidation, rebuildMarkers, getPolygonColors, onZoomChange, onBoundsChange])
+
+  // Update color scheme without recreating the map
+  useEffect(() => {
+    if (!mapInstanceRef.current) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(mapInstanceRef.current as any).setOptions({
+      colorScheme: colorScheme === 'dark' ? 'DARK' : 'LIGHT',
+    })
+  }, [colorScheme])
   
   // Separate effect to update center when coordinates change
   useEffect(() => {

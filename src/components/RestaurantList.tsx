@@ -400,7 +400,17 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
       }
       mapInstanceRef.current = null;
     };
-  }, [restaurants, onMarkerHover, city, mapColorScheme]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurants, onMarkerHover, city]);
+
+  // Update color scheme without recreating the map
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mapInstanceRef.current as unknown as { setOptions: (opts: Record<string, unknown>) => void }).setOptions({
+      colorScheme: mapColorScheme === 'dark' ? 'DARK' : 'LIGHT',
+    });
+  }, [mapColorScheme]);
 
   // Handle marker highlighting when hovering over restaurant list
   useEffect(() => {

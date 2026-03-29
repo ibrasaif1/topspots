@@ -816,7 +816,7 @@ function GoogleMapComponent({
     clustererRef.current = new MarkerClusterer({
       map: mapInstanceRef.current,
       markers: allMarkers,
-      algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 12 }),
+      algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 14 }),
       renderer: clusterRenderer,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onClusterClick: (_: any, cluster: any, map: any) => {

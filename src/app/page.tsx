@@ -60,6 +60,7 @@ export default function Page() {
   
   // Handlers for map viewport changes
   const handleZoomChange = useCallback((newZoom: number) => {
+    console.log('[map] zoom:', newZoom);
     setZoom(newZoom);
   }, []);
   

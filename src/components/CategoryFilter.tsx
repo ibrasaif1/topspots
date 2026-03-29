@@ -43,13 +43,13 @@ export default function CategoryFilter({ selected, onChange }: CategoryFilterPro
           className={cn(
             "flex-1 rounded-full px-2 py-2 text-xs whitespace-nowrap font-medium",
             "cursor-pointer transition-transform duration-200 ease-out",
-            "border border-slate-300 bg-slate-100 shadow-[0_3px_0_0_#94a3b8]",
-            "hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-[0_1px_0_0_#94a3b8]",
-            "dark:bg-zinc-800 dark:border-zinc-600 dark:text-zinc-200 dark:shadow-[0_3px_0_0_#18181b]",
-            "dark:active:shadow-[0_1px_0_0_#18181b]",
-            "data-[state=on]:translate-y-0.5 data-[state=on]:shadow-[0_1px_0_0_#1e293b]",
-            "data-[state=on]:bg-slate-900 data-[state=on]:text-white data-[state=on]:border-slate-900",
-            "dark:data-[state=on]:bg-white dark:data-[state=on]:text-zinc-900 dark:data-[state=on]:border-white dark:data-[state=on]:shadow-[0_1px_0_0_#71717a]",
+            "border border-zinc-300 bg-zinc-100 shadow-[0_3px_0_0_var(--shadow-outline)]",
+            "hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-[0_1px_0_0_var(--shadow-outline)]",
+            "dark:bg-zinc-800 dark:border-zinc-600 dark:text-zinc-200 dark:shadow-[0_3px_0_0_var(--shadow-outline)]",
+            "dark:active:shadow-[0_1px_0_0_var(--shadow-outline)]",
+            "data-[state=on]:translate-y-0.5 data-[state=on]:shadow-[0_1px_0_0_var(--shadow-primary)]",
+            "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary",
+            "dark:data-[state=on]:bg-primary dark:data-[state=on]:text-primary-foreground dark:data-[state=on]:border-primary dark:data-[state=on]:shadow-[0_1px_0_0_var(--shadow-primary)]",
           )}
         >
           {CATEGORY_ICONS[cat.id]} {cat.label}

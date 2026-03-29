@@ -248,7 +248,7 @@ export default function Page() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-zinc-950 relative overflow-hidden">
+    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden">
       {mockMode && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-amber-400 text-amber-900 text-xs font-semibold text-center py-1">
           MOCK MODE — Data is simulated
@@ -257,14 +257,14 @@ export default function Page() {
       <div style={{ width: `${LEFT_SIDEBAR_FRACTION * 100}%` }} className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
         <div className="w-full max-w-lg">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-6xl font-bold text-slate-900 dark:text-white">
+            <h1 className="text-6xl font-bold text-foreground">
               TopSpots
             </h1>
             <div className="flex items-center gap-1">
               {zoom > 4 && (
                 <button
                   onClick={() => setResetView(true)}
-                  className="w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-700 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
                   aria-label="Home"
                 >
                   <Home className="w-5 h-5" />
@@ -272,20 +272,20 @@ export default function Page() {
               )}
               <button
                 onClick={() => setHelpOpen(true)}
-                className="w-8 h-8 rounded-full border-2 border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center text-lg font-semibold transition-colors"
+                className="w-8 h-8 rounded-full border-2 border-zinc-400 text-zinc-600 hover:border-zinc-600 hover:text-zinc-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center text-lg font-semibold transition-colors"
                 aria-label="Help"
               >
                 ?
               </button>
             </div>
           </div>
-          <div className="text-m text-slate-700 dark:text-zinc-400 mb-4">
+          <div className="text-m text-muted-foreground mb-4">
             Zoom in or search for an area to conduct your own search
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 dark:text-zinc-400 mb-2 block">
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
                 Search Location
               </label>
               <input
@@ -293,7 +293,7 @@ export default function Page() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Enter city or address..."
-                className="w-full px-4 py-2 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 dark:bg-zinc-800/60 dark:border-zinc-600 dark:text-white dark:placeholder-zinc-500"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground dark:bg-zinc-800/60 dark:border-zinc-600 dark:text-white dark:placeholder-zinc-500"
               />
             </div>
 
@@ -310,10 +310,10 @@ export default function Page() {
                   ? 'bg-orange-50 border-orange-300 dark:bg-orange-950/40 dark:border-orange-800/50'
                   : 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/50'
               }`}>
-                <p className="text-sm text-slate-700 dark:text-zinc-300 mb-1">
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 mb-1">
                   Click <span className="font-semibold">4 points</span> on the map
                 </p>
-                <p className="text-sm text-slate-600 dark:text-zinc-400">
+                <p className="text-sm text-muted-foreground">
                   Points selected: <span className="font-semibold">{polygon.length}/4</span>
                 </p>
               </div>
@@ -333,7 +333,6 @@ export default function Page() {
                   setPolygon([]);
                   setClearPolygon(true);
                 }}
-                variant="outline"
                 className="w-full"
               >
                 Clear Points
@@ -387,12 +386,12 @@ export default function Page() {
       >
         {/* Panel Header */}
         <div className="p-4 border-b border-white/20 dark:border-zinc-700/40">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-foreground">
             {selectedCategories.length === 1 && selectedCategories[0] === 'topspots'
               ? 'TopSpots in View'
               : 'Restaurants in View'}
           </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-muted-foreground">
             {visibleRestaurants.length} restaurant{visibleRestaurants.length !== 1 ? 's' : ''} • {CATEGORIES.filter(c => selectedCategories.includes(c.id)).map(c => c.label).join(', ')}
           </p>
         </div>
@@ -432,28 +431,28 @@ export default function Page() {
                       Popular
                     </span>
                   )}
-                  <h3 className={`font-semibold text-slate-900 dark:text-white text-sm leading-snug mb-1${restaurant.reviews >= 10000 ? ' pr-14' : ''}`}>
+                  <h3 className={`font-semibold text-foreground text-sm leading-snug mb-1${restaurant.reviews >= 10000 ? ' pr-14' : ''}`}>
                     {restaurant.name}
                   </h3>
                   
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                  <div className="text-xs text-muted-foreground mb-2">
                     {restaurant.cuisine || 'Restaurant'}
                   </div>
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-sm">
                       <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                      <span className="font-medium text-slate-900 dark:text-white">
+                      <span className="font-medium text-foreground">
                         {restaurant.rating.toFixed(1)}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <div className="text-xs text-muted-foreground">
                       {(Math.floor(restaurant.reviews / 100) * 100).toLocaleString()}+ reviews
                     </div>
                   </div>
                   
                   {restaurant.priceRange && (
-                    <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-300">
                       {restaurant.priceRange}
                     </div>
                   )}
@@ -477,32 +476,32 @@ export default function Page() {
 
           <div className="space-y-4 py-4">
             <div className={`p-4 border rounded-lg ${mockMode ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/50' : 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/50'}`}>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white text-center">
+              <p className="text-2xl font-bold text-foreground text-center">
                 {placeCount !== null ? placeCount : '—'}
               </p>
-              <p className="text-sm text-slate-600 dark:text-zinc-400 text-center mt-1">
+              <p className="text-sm text-muted-foreground text-center mt-1">
                 places found in this area
               </p>
 
               {placeCount !== null && placeCount > 0 && !mockMode && (
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <div className="flex flex-col items-center">
-                    <p className="text-lg font-semibold text-slate-800 dark:text-zinc-200">
+                    <p className="text-lg font-semibold text-foreground">
                       ${((placeCount * 0.02) * 1.029 + 0.30).toFixed(2)}
                     </p>
-                    <p className="text-xs text-slate-500 text-center mt-1">cost</p>
+                    <p className="text-xs text-muted-foreground text-center mt-1">cost</p>
                     <div className="relative" data-price-panel>
                       <button
                         onClick={() => setPriceDialogOpen(!priceDialogOpen)}
-                        className="text-xs text-blue-600 hover:text-blue-800 underline mt-1"
+                        className="text-xs text-accent hover:text-accent/80 underline mt-1"
                         data-price-panel
                       >
                         why so expensive?
                       </button>
                       {priceDialogOpen && (
-                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-48 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-lg z-50" data-price-panel>
+                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-48 p-3 bg-zinc-800 text-white text-xs rounded-lg shadow-lg z-50" data-price-panel>
                           <p>Google Maps API charges $0.02 per place, and we add a 2.9% fee + $0.30 for Stripe processing.</p>
-                          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-800"></div>
+                          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-800"></div>
                         </div>
                       )}
                     </div>
@@ -533,7 +532,7 @@ export default function Page() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            <p className="text-slate-600 dark:text-slate-100">
+            <p className="text-muted-foreground dark:text-zinc-100">
               Check out places we&apos;ve already found, or add places in your own search area by defining a polygon
             </p>
 

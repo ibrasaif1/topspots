@@ -7,6 +7,24 @@ import type { Renderer } from '@googlemaps/markerclusterer'
 import { isCounterClockwise, LEFT_SIDEBAR_FRACTION, RIGHT_SIDEBAR_FRACTION } from '@/lib/utils'
 import type { CategoryId } from '@/config/filters'
 
+// Theme constants for Google Maps inline styles (CSS variables aren't available here)
+const THEME = {
+  accent: '#2563EB',
+  accentRgba75: 'rgba(37,99,235,0.75)',
+  zinc50: '#fafafa',
+  zinc800: '#27272a',
+  zinc900: '#18181b',
+  emerald: '#10b981',
+  emeraldRgba75: 'rgba(16,185,129,0.75)',
+  orange: '#f97316',
+  amber: '#f59e0b',
+  ratingGreen: '#059669',
+  ratingGreenDark: '#34d399',
+  detailGray: '#6b7280',
+  detailGrayDark: '#a1a1aa',
+  popularBorder: '#d97706',
+} as const
+
 // SVG paths for category icons (exact Lucide paths)
 const CATEGORY_ICON_SVGS: Record<CategoryId, string> = {
   topspots: `<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" fill="currentColor"/>`,
@@ -20,15 +38,15 @@ function isDarkMode(): boolean {
 
 function getMarkerColors(highlighted: boolean, popular: boolean) {
   const dark = isDarkMode()
-  const border = popular ? '#d97706' : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)')
+  const border = popular ? THEME.popularBorder : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)')
   if (highlighted) {
     return dark
-      ? { bg: '#3b82f6', border, text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
-      : { bg: 'rgba(59,130,246,0.75)', border, text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+      ? { bg: THEME.accent, border, text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+      : { bg: THEME.accentRgba75, border, text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
   }
   return dark
-    ? { bg: '#18181b', border, text: '#fafafa', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
-    : { bg: 'rgba(255,255,255,0.65)', border, text: '#18181b', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+    ? { bg: THEME.zinc900, border, text: THEME.zinc50, shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+    : { bg: 'rgba(255,255,255,0.65)', border, text: THEME.zinc900, shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
 }
 
 function getCategoryForRestaurant(rating: number, reviews: number): CategoryId {
@@ -237,17 +255,17 @@ function GoogleMapComponent({
   // Get polygon colors based on validity
   const getPolygonColors = useCallback((points: {lat: number, lng: number}[]) => {
     if (isLocked) {
-      return { strokeColor: '#10b981', fillColor: '#10b981', fillOpacity: 0.15 };
+      return { strokeColor: THEME.emerald, fillColor: THEME.emerald, fillOpacity: 0.15 };
     }
 
     if (points.length >= 3) {
       const isValid = isCounterClockwise(points);
       if (!isValid) {
-        return { strokeColor: '#f97316', fillColor: '#f97316', fillOpacity: 0.2 }; // Orange for invalid
+        return { strokeColor: THEME.orange, fillColor: THEME.orange, fillOpacity: 0.2 };
       }
     }
 
-    return { strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2 }; // Blue for valid/default
+    return { strokeColor: THEME.accent, fillColor: THEME.accent, fillOpacity: 0.2 };
   }, [isLocked]);
   getPolygonColorsRef.current = getPolygonColors
 
@@ -258,20 +276,20 @@ function GoogleMapComponent({
     if (dark) {
       div.style.cssText = `
         width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-        border-radius: 9999px; background: ${isLocked ? '#10b981' : '#18181b'};
-        border: 1px solid ${isLocked ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.5)'};
+        border-radius: 9999px; background: ${isLocked ? THEME.emerald : THEME.zinc900};
+        border: 1px solid rgba(255,255,255,0.5);
         box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-        color: ${isLocked ? '#ffffff' : '#fafafa'}; font-size: 13px; font-weight: 600;
+        color: ${isLocked ? '#ffffff' : THEME.zinc50}; font-size: 13px; font-weight: 600;
         user-select: none;
       `
     } else {
       div.style.cssText = `
         width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-        border-radius: 9999px; background: ${isLocked ? 'rgba(16,185,129,0.75)' : 'rgba(255,255,255,0.65)'};
+        border-radius: 9999px; background: ${isLocked ? THEME.emeraldRgba75 : 'rgba(255,255,255,0.65)'};
         backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        border: 1px solid ${isLocked ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.3)'};
+        border: 1px solid rgba(0,0,0,0.3);
         box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
-        color: ${isLocked ? '#ffffff' : '#18181b'}; font-size: 13px; font-weight: 600;
+        color: ${isLocked ? '#ffffff' : THEME.zinc900}; font-size: 13px; font-weight: 600;
         user-select: none;
       `
     }
@@ -533,10 +551,10 @@ function GoogleMapComponent({
       polygonRef.current.setMap(null)
       const lockedPolygon = new window.google.maps.Polygon({
         paths: polygonPoints,
-        strokeColor: '#10b981',
+        strokeColor: THEME.emerald,
         strokeOpacity: 0.8,
         strokeWeight: 3,
-        fillColor: '#10b981',
+        fillColor: THEME.emerald,
         fillOpacity: 0.15,
         map: mapInstanceRef.current
       })
@@ -635,9 +653,9 @@ function GoogleMapComponent({
       const googleMapsUrl = `https://www.google.com/maps/place/?q=place_id:${cleanPlaceId}`
 
       const iwDark = colorScheme === 'dark'
-      const iwNameColor = iwDark ? '#fafafa' : '#111827'
-      const iwRatingColor = iwDark ? '#34d399' : '#059669'
-      const iwDetailColor = iwDark ? '#a1a1aa' : '#6b7280'
+      const iwNameColor = iwDark ? THEME.zinc50 : '#111827'
+      const iwRatingColor = iwDark ? THEME.ratingGreenDark : THEME.ratingGreen
+      const iwDetailColor = iwDark ? THEME.detailGrayDark : THEME.detailGray
 
       const content = `
         <div style="
@@ -652,7 +670,7 @@ function GoogleMapComponent({
             ${escapeHtml(restaurant.name)}
           </div>
 
-          ${restaurant.rating ? `<div style="color: ${iwRatingColor}; margin: 0 0 4px 0; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 3px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>${restaurant.rating.toFixed(1)} · ${(Math.floor((restaurant.reviews ?? 0) / 100) * 100).toLocaleString()}+ reviews</div>` : ""}
+          ${restaurant.rating ? `<div style="color: ${iwRatingColor}; margin: 0 0 4px 0; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 3px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="${THEME.amber}" stroke="none"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>${restaurant.rating.toFixed(1)} · ${(Math.floor((restaurant.reviews ?? 0) / 100) * 100).toLocaleString()}+ reviews</div>` : ""}
 
           ${detailParts.length ? `<div style="color: ${iwDetailColor}; font-size: 12px; margin: 0;">${detailParts.join(" · ")}</div>` : ""}
         </div>
@@ -750,10 +768,10 @@ function GoogleMapComponent({
             align-items: center;
             justify-content: center;
             border-radius: 9999px;
-            background: #18181b;
+            background: ${THEME.zinc900};
             box-shadow: 0 1px 3px rgba(0,0,0,0.12);
             border: 1px solid rgba(255,255,255,0.5);
-            color: #fafafa;
+            color: ${THEME.zinc50};
             font-size: 13px;
             font-weight: 500;
             letter-spacing: -0.01em;
@@ -763,11 +781,11 @@ function GoogleMapComponent({
             user-select: none;
           `
           div.addEventListener('mouseenter', () => {
-            div.style.background = '#27272a'
+            div.style.background = THEME.zinc800
             div.style.borderColor = 'rgba(255,255,255,0.6)'
           })
           div.addEventListener('mouseleave', () => {
-            div.style.background = '#18181b'
+            div.style.background = THEME.zinc900
             div.style.borderColor = 'rgba(255,255,255,0.5)'
           })
         } else {
@@ -783,7 +801,7 @@ function GoogleMapComponent({
             -webkit-backdrop-filter: blur(12px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
             border: 1px solid rgba(0,0,0,0.3);
-            color: #18181b;
+            color: ${THEME.zinc900};
             font-size: 13px;
             font-weight: 600;
             letter-spacing: -0.01em;
@@ -816,7 +834,7 @@ function GoogleMapComponent({
     clustererRef.current = new MarkerClusterer({
       map: mapInstanceRef.current,
       markers: allMarkers,
-      algorithm: new SuperClusterAlgorithm({ radius: 100, maxZoom: 13 }),
+      algorithm: new SuperClusterAlgorithm({ radius: 80, maxZoom: 13 }),
       renderer: clusterRenderer,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onClusterClick: (_: any, cluster: any, map: any) => {

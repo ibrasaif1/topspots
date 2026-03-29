@@ -351,10 +351,10 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
           lat: coord.latitude,
           lng: coord.longitude
         })),
-        strokeColor: "#3B82F6",
+        strokeColor: "#2563EB",
         strokeOpacity: 0.8,
         strokeWeight: 2,
-        fillColor: "#3B82F6",
+        fillColor: "#2563EB",
         fillOpacity: 0.1,
       });
       polygon.setMap(map);
@@ -423,8 +423,8 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
           if (isHovered) {
             // Create highlighted pin
             const highlightedPin = new google.maps.marker.PinElement({
-              background: "#3B82F6",
-              borderColor: "#2563EB",
+              background: "#2563EB",
+              borderColor: "#1d4ed8",
               glyphColor: "#FFFFFF",
               scale: 1.3,
             });
@@ -449,7 +449,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
             (marker as GoogleMapsLegacyMarker).setIcon({
               url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#3B82F6"/>
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#2563EB"/>
                 </svg>
               `),
               scaledSize: new google.maps.Size(32, 32),
@@ -541,7 +541,7 @@ export default function RestaurantList({ city }: { city?: string }) {
   }, [restaurants]);
   
 
-  if (loading) return <div className="text-center text-neutral-600">Loading…</div>;
+  if (loading) return <div className="text-center text-muted-foreground">Loading…</div>;
   if (error) return <div className="text-center text-red-600">{error}</div>;
 
   return (
@@ -549,7 +549,7 @@ export default function RestaurantList({ city }: { city?: string }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
         {/* Google Map */}
-        <div className="h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <div className="h-full bg-card rounded-lg border border-border overflow-hidden">
           <Wrapper
             apiKey={process.env.NODE_ENV === "production"
               ? process.env.NEXT_PUBLIC_FRONTEND_API_KEY || ""
@@ -567,7 +567,7 @@ export default function RestaurantList({ city }: { city?: string }) {
         </div>
 
         {/* Restaurant List */}
-        <div className="h-full bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <div className="h-full bg-card rounded-lg border border-border overflow-hidden">
           <div className="h-full overflow-y-auto p-4">
             <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
               {items.map((r) => {
@@ -578,8 +578,8 @@ export default function RestaurantList({ city }: { city?: string }) {
                     className={
                       "group relative rounded-lg border overflow-hidden cursor-pointer flex flex-col transition-all duration-200 ease-out " +
                       (isHovered
-                        ? "bg-blue-50 border-blue-300 shadow-md ring-1 ring-blue-200"
-                        : "bg-white border-neutral-200 hover:border-blue-300 hover:shadow-md hover:ring-1 hover:ring-blue-200")
+                        ? "bg-accent/10 border-accent/40 shadow-md ring-1 ring-accent/20"
+                        : "bg-card border-border hover:border-accent/40 hover:shadow-md hover:ring-1 hover:ring-accent/20")
                     }
                     onMouseEnter={() => setHoveredRestaurant(r.place_id)}
                     onMouseLeave={() => setHoveredRestaurant(null)}
@@ -593,18 +593,18 @@ export default function RestaurantList({ city }: { city?: string }) {
                     }}
                   >
                     <div className="p-3">
-                      <h3 className="font-semibold text-sm leading-snug break-words text-gray-900 mb-1" title={r.name}>
+                      <h3 className="font-semibold text-sm leading-snug break-words text-foreground mb-1" title={r.name}>
                         {r.name}
                       </h3>
-                      <div className="text-xs text-gray-600 truncate mb-2" title={r.cuisine || "Restaurant"}>
+                      <div className="text-xs text-muted-foreground truncate mb-2" title={r.cuisine || "Restaurant"}>
                         {r.cuisine || "Restaurant"}
                       </div>
 
                       <div className="flex justify-between items-end">
-                        <div className="text-sm text-gray-900 leading-tight tabular-nums font-medium">
+                        <div className="text-sm text-foreground leading-tight tabular-nums font-medium">
                           ⭐ {r.rating?.toFixed(1) ?? "-"}
                         </div>
-                        <div className="text-xs text-gray-500">{Number(r.reviews || 0).toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">{Number(r.reviews || 0).toLocaleString()}</div>
                       </div>
                     </div>
                   </article>

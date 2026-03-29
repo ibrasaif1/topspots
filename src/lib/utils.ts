@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Sidebar layout fractions (of viewport width)
+// Keep in sync with Tailwind classes: left sidebar = w-1/3, right sidebar = w-1/6
+export const LEFT_SIDEBAR_FRACTION = 1 / 3
+export const RIGHT_SIDEBAR_FRACTION = 1 / 6
+
 /**
  * Check if a polygon is drawn in counter-clockwise order using the Shoelace formula
  * @param points Array of lat/lng coordinates

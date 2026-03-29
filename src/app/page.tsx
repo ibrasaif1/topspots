@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import GoogleMapsEmbed from "../components/GoogleMapsEmbed";
 import CategoryFilter from "@/components/CategoryFilter";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import {
   matchesAnyCategory,
   getWidestFetchParams,
 } from "@/config/filters";
-import { Star } from "lucide-react";
+import { Star, Home } from "lucide-react";
+import { LEFT_SIDEBAR_FRACTION, RIGHT_SIDEBAR_FRACTION } from "@/lib/utils";
 
 type Restaurant = {
   place_id: string;
@@ -45,12 +46,14 @@ export default function Page() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [placeCount, setPlaceCount] = useState<number | null>(null);
   const [clearPolygon, setClearPolygon] = useState(false);
+  const [resetView, setResetView] = useState(false);
   const [mockMode, setMockMode] = useState(false);
   
   // Viewport tracking state
   const [zoom, setZoom] = useState<number>(4);
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [hoveredRestaurantId, setHoveredRestaurantId] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<CategoryId[]>(DEFAULT_SELECTED_CATEGORIES);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -250,19 +253,30 @@ export default function Page() {
           MOCK MODE — Data is simulated
         </div>
       )}
-      <div className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 w-1/3 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
+      <div style={{ width: `${LEFT_SIDEBAR_FRACTION * 100}%` }} className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
         <div className="w-full max-w-lg">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-6xl font-bold text-slate-900 dark:text-white">
               TopSpots
             </h1>
-            <button
-              onClick={() => setHelpOpen(true)}
-              className="w-8 h-8 rounded-full border-2 border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center text-lg font-semibold transition-colors"
-              aria-label="Help"
-            >
-              ?
-            </button>
+            <div className="flex items-center gap-1">
+              {zoom > 4 && (
+                <button
+                  onClick={() => setResetView(true)}
+                  className="w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-700 dark:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-200 flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Home"
+                >
+                  <Home className="w-5 h-5" />
+                </button>
+              )}
+              <button
+                onClick={() => setHelpOpen(true)}
+                className="w-8 h-8 rounded-full border-2 border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200 flex items-center justify-center text-lg font-semibold transition-colors"
+                aria-label="Help"
+              >
+                ?
+              </button>
+            </div>
           </div>
           <div className="text-m text-slate-700 dark:text-zinc-400 mb-4">
             Zoom in or search for an area to conduct your own search
@@ -352,13 +366,17 @@ export default function Page() {
           onZoomChange={handleZoomChange}
           onBoundsChange={handleBoundsChange}
           hoveredRestaurantId={hoveredRestaurantId}
+          rightSidebarVisible={showRestaurantList}
+          resetView={resetView}
+          onViewReset={() => setResetView(false)}
         />
       </div>
 
       {/* Restaurant List Panel - appears when zoomed in */}
-      <div 
+      <div
+        style={{ width: `${RIGHT_SIDEBAR_FRACTION * 100}%` }}
         className={`
-          absolute right-0 top-0 bottom-0 w-1/6
+          absolute right-0 top-0 bottom-0
           bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl
           border-l border-white/20 dark:border-zinc-700/40
           transition-transform duration-300 ease-out
@@ -390,18 +408,30 @@ export default function Page() {
                 <article
                   key={restaurant.place_id}
                   className={`
-                    p-3 rounded-lg border cursor-pointer
+                    relative p-3 rounded-lg border cursor-pointer
                     transition-all duration-150 ease-out
                     ${isHovered
                       ? 'bg-white/40 border-white/60 shadow-md dark:bg-zinc-700/60 dark:border-zinc-500/60 dark:shadow-lg dark:shadow-black/30'
                       : 'bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50 dark:bg-zinc-800/40 dark:border-zinc-700/40 dark:hover:bg-zinc-700/50 dark:hover:border-zinc-600/50'
                     }
                   `}
-                  onMouseEnter={() => setHoveredRestaurantId(restaurant.place_id)}
-                  onMouseLeave={() => setHoveredRestaurantId(null)}
+                  onMouseEnter={() => {
+                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                    hoverTimeoutRef.current = setTimeout(() => setHoveredRestaurantId(restaurant.place_id), 15);
+                  }}
+                  onMouseLeave={() => {
+                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                    hoverTimeoutRef.current = null;
+                    setHoveredRestaurantId(null);
+                  }}
                   onClick={() => window.open(googleMapsUrl, '_blank')}
                 >
-                  <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-snug mb-1">
+                  {restaurant.reviews >= 10000 && (
+                    <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                      Popular
+                    </span>
+                  )}
+                  <h3 className={`font-semibold text-slate-900 dark:text-white text-sm leading-snug mb-1${restaurant.reviews >= 10000 ? ' pr-14' : ''}`}>
                     {restaurant.name}
                   </h3>
                   

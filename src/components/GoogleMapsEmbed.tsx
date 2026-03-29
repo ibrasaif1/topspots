@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Wrapper } from '@googlemaps/react-wrapper'
 import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer'
 import type { Renderer } from '@googlemaps/markerclusterer'
-import { isCounterClockwise } from '@/lib/utils'
+import { isCounterClockwise, LEFT_SIDEBAR_FRACTION, RIGHT_SIDEBAR_FRACTION } from '@/lib/utils'
 import type { CategoryId } from '@/config/filters'
 
 // SVG paths for category icons (exact Lucide paths)
@@ -85,6 +85,9 @@ interface GoogleMapsEmbedProps {
   onZoomChange?: (zoom: number) => void
   onBoundsChange?: (bounds: Bounds) => void
   hoveredRestaurantId?: string | null
+  rightSidebarVisible?: boolean
+  resetView?: boolean
+  onViewReset?: () => void
 }
 
 function GoogleMapComponent({
@@ -100,6 +103,9 @@ function GoogleMapComponent({
   onZoomChange,
   onBoundsChange,
   hoveredRestaurantId,
+  rightSidebarVisible,
+  resetView,
+  onViewReset,
 }: {
   location?: string
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
@@ -121,6 +127,9 @@ function GoogleMapComponent({
   onZoomChange?: (zoom: number) => void
   onBoundsChange?: (bounds: Bounds) => void
   hoveredRestaurantId?: string | null
+  rightSidebarVisible?: boolean
+  resetView?: boolean
+  onViewReset?: () => void
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,10 +150,28 @@ function GoogleMapComponent({
   const infoWindowCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isHoveringInfoWindowRef = useRef<boolean>(false)
   const sidebarHoverActiveRef = useRef<boolean>(false)
+  const prevHoveredIdRef = useRef<string | null>(null)
   const zoomRef = useRef<number>(zoom ?? 0)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const polygonRef = useRef<any>(null)
+  const rightSidebarVisibleRef = useRef<boolean>(rightSidebarVisible ?? false)
+  // Stable refs for props used inside map event listeners — avoids re-creating the map
+  const isLockedRef = useRef(isLocked)
+  const onPolygonChangeRef = useRef(onPolygonChange)
+  const onPolygonValidationRef = useRef(onPolygonValidation)
+  const onZoomChangeRef = useRef(onZoomChange)
+  const onBoundsChangeRef = useRef(onBoundsChange)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rebuildMarkersRef = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getPolygonColorsRef = useRef<any>(null)
   useEffect(() => { zoomRef.current = zoom ?? 0 }, [zoom])
+  useEffect(() => { rightSidebarVisibleRef.current = rightSidebarVisible ?? false }, [rightSidebarVisible])
+  useEffect(() => { isLockedRef.current = isLocked }, [isLocked])
+  useEffect(() => { onPolygonChangeRef.current = onPolygonChange }, [onPolygonChange])
+  useEffect(() => { onPolygonValidationRef.current = onPolygonValidation }, [onPolygonValidation])
+  useEffect(() => { onZoomChangeRef.current = onZoomChange }, [onZoomChange])
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange }, [onBoundsChange])
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   )
@@ -156,6 +183,29 @@ function GoogleMapComponent({
   }, [])
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<{lat: number, lng: number}[]>([])
+
+  // Compute visible bounds excluding sidebar areas
+  // Pixel-to-longitude is linear in Mercator, so we can shrink the lng range proportionally
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getVisibleBounds = useCallback((map: any): Bounds | null => {
+    const bounds = map.getBounds()
+    if (!bounds) return null
+    const ne = bounds.getNorthEast()
+    const sw = bounds.getSouthWest()
+    const fullWest = sw.lng()
+    const fullEast = ne.lng()
+    const lngRange = fullEast - fullWest
+
+    const leftFraction = LEFT_SIDEBAR_FRACTION
+    const rightFraction = rightSidebarVisibleRef.current ? RIGHT_SIDEBAR_FRACTION : 0
+
+    return {
+      north: ne.lat(),
+      south: sw.lat(),
+      west: fullWest + lngRange * leftFraction,
+      east: fullEast - lngRange * rightFraction,
+    }
+  }, [])
 
   // Geocode location when it changes (debounced)
   useEffect(() => {
@@ -196,6 +246,7 @@ function GoogleMapComponent({
 
     return { strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2 }; // Blue for valid/default
   }, [isLocked]);
+  getPolygonColorsRef.current = getPolygonColors
 
   // Create marker HTML element
   const createMarkerElement = useCallback((number: number) => {
@@ -327,6 +378,7 @@ function GoogleMapComponent({
       markersRef.current.push(marker)
     })
   }, [isLocked, onPolygonChange, onPolygonValidation, createMarkerElement, getPolygonColors])
+  rebuildMarkersRef.current = rebuildMarkers
 
   // Initialize map once
   useEffect(() => {
@@ -349,17 +401,9 @@ function GoogleMapComponent({
     const debouncedBoundsChange = () => {
       if (boundsTimeout) clearTimeout(boundsTimeout)
       boundsTimeout = setTimeout(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const bounds = (map as any).getBounds()
-        if (bounds && onBoundsChange) {
-          const ne = bounds.getNorthEast()
-          const sw = bounds.getSouthWest()
-          onBoundsChange({
-            north: ne.lat(),
-            south: sw.lat(),
-            east: ne.lng(),
-            west: sw.lng()
-          })
+        const visibleBounds = getVisibleBounds(map)
+        if (visibleBounds && onBoundsChangeRef.current) {
+          onBoundsChangeRef.current(visibleBounds)
         }
       }, 150) // Debounce by 150ms
     }
@@ -368,8 +412,8 @@ function GoogleMapComponent({
     map.addListener('zoom_changed', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const zoom = (map as any).getZoom()
-      if (zoom !== undefined && onZoomChange) {
-        onZoomChange(zoom)
+      if (zoom !== undefined && onZoomChangeRef.current) {
+        onZoomChangeRef.current(zoom)
       }
       // Also update bounds when zoom changes
       debouncedBoundsChange()
@@ -382,39 +426,31 @@ function GoogleMapComponent({
     map.addListener('idle', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const zoom = (map as any).getZoom()
-      if (zoom !== undefined && onZoomChange) {
-        onZoomChange(zoom)
+      if (zoom !== undefined && onZoomChangeRef.current) {
+        onZoomChangeRef.current(zoom)
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const bounds = (map as any).getBounds()
-      if (bounds && onBoundsChange) {
-        const ne = bounds.getNorthEast()
-        const sw = bounds.getSouthWest()
-        onBoundsChange({
-          north: ne.lat(),
-          south: sw.lat(),
-          east: ne.lng(),
-          west: sw.lng()
-        })
+      const visibleBounds = getVisibleBounds(map)
+      if (visibleBounds && onBoundsChangeRef.current) {
+        onBoundsChangeRef.current(visibleBounds)
       }
     })
-  
+
     // Handle map clicks to add polygon points
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map.addListener('click', (e: any) => {
-      if (isLocked || !e.latLng) return
-  
+      if (isLockedRef.current || !e.latLng) return
+
       const clickedLat = e.latLng.lat()
       const clickedLng = e.latLng.lng()
       const newPoint = { lat: clickedLat, lng: clickedLng }
-  
+
       setPolygonPoints(prev => {
         if (prev.length >= 4) return prev
-  
+
         const updated = [...prev, newPoint]
-  
+
         if (updated.length >= 3) {
-          const colors = getPolygonColors(updated);
+          const colors = getPolygonColorsRef.current(updated);
           if (polygonRef.current) {
             polygonRef.current.setPath(updated)
             polygonRef.current.setOptions({
@@ -436,21 +472,21 @@ function GoogleMapComponent({
           }
         }
 
-        rebuildMarkers(updated)
+        rebuildMarkersRef.current(updated)
 
-        onPolygonChange?.(updated)
+        onPolygonChangeRef.current?.(updated)
 
         // Notify parent about validation status
         if (updated.length >= 3) {
-          onPolygonValidation?.(isCounterClockwise(updated))
+          onPolygonValidationRef.current?.(isCounterClockwise(updated))
         } else {
-          onPolygonValidation?.(true) // Not enough points = valid by default
+          onPolygonValidationRef.current?.(true) // Not enough points = valid by default
         }
 
         return updated
       })
     })
-  
+
     return () => {
       if (boundsTimeout) clearTimeout(boundsTimeout)
       markersRef.current.forEach(marker => marker.setMap(null))
@@ -462,7 +498,7 @@ function GoogleMapComponent({
       mapInstanceRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLocked, onPolygonChange, onPolygonValidation, rebuildMarkers, getPolygonColors, onZoomChange, onBoundsChange])
+  }, [getVisibleBounds])
 
   // Update color scheme without recreating the map
   useEffect(() => {
@@ -530,6 +566,15 @@ function GoogleMapComponent({
       onPolygonCleared?.()
     }
   }, [clearPolygon, onPolygonCleared])
+
+  // Handle reset view to initial state
+  useEffect(() => {
+    if (resetView && mapInstanceRef.current) {
+      mapInstanceRef.current.setCenter({ lat: 35, lng: 240 })
+      mapInstanceRef.current.setZoom(4)
+      onViewReset?.()
+    }
+  }, [resetView, onViewReset])
 
   // Add restaurant markers with clustering
   useEffect(() => {
@@ -766,18 +811,13 @@ function GoogleMapComponent({
     clustererRef.current = new MarkerClusterer({
       map: mapInstanceRef.current,
       markers: allMarkers,
-      algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 9 }),
+      algorithm: new SuperClusterAlgorithm({ radius: 60, maxZoom: 12 }),
       renderer: clusterRenderer,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onClusterClick: (_: any, cluster: any, map: any) => {
-        const markers = cluster.markers
-        if (!markers || markers.length === 0) return
-        const bounds = new window.google.maps.LatLngBounds()
-        for (const marker of markers) {
-          const pos = marker.position
-          if (pos) bounds.extend(pos)
-        }
-        map.fitBounds(bounds, { left: 420, top: 50, right: 50, bottom: 50 })
+        const currentZoom = map.getZoom() ?? 0
+        map.setCenter(cluster.position)
+        map.setZoom(currentZoom + 2)
       },
     })
 
@@ -808,11 +848,20 @@ function GoogleMapComponent({
     if (!window.google?.maps) return
 
     sidebarHoverActiveRef.current = !!hoveredRestaurantId
+    const prevId = prevHoveredIdRef.current
+    prevHoveredIdRef.current = hoveredRestaurantId ?? null
 
-    restaurantMarkersRef.current.forEach((marker, placeId) => {
-      const isHovered = placeId === hoveredRestaurantId
+    // Only update the marker being un-hovered and the one being hovered
+    const idsToUpdate = new Set<string>()
+    if (prevId) idsToUpdate.add(prevId)
+    if (hoveredRestaurantId) idsToUpdate.add(hoveredRestaurantId)
+
+    for (const placeId of idsToUpdate) {
+      const marker = restaurantMarkersRef.current.get(placeId)
       const eventData = markerEventDataRef.current.get(placeId)
-      if (!eventData) return
+      if (!marker || !eventData) continue
+
+      const isHovered = placeId === hoveredRestaurantId
 
       try {
         const newContent = createCategoryMarkerElement(eventData.category, isHovered)
@@ -840,7 +889,7 @@ function GoogleMapComponent({
       } catch (error) {
         console.warn('Failed to update marker highlight:', error)
       }
-    })
+    }
   }, [hoveredRestaurantId])
 
   return (
@@ -871,6 +920,9 @@ export default function GoogleMapsEmbed({
   onZoomChange,
   onBoundsChange,
   hoveredRestaurantId,
+  rightSidebarVisible,
+  resetView,
+  onViewReset,
 }: GoogleMapsEmbedProps) {
   return (
     <Wrapper
@@ -893,6 +945,9 @@ export default function GoogleMapsEmbed({
         onZoomChange={onZoomChange}
         onBoundsChange={onBoundsChange}
         hoveredRestaurantId={hoveredRestaurantId}
+        rightSidebarVisible={rightSidebarVisible}
+        resetView={resetView}
+        onViewReset={onViewReset}
       />
     </Wrapper>
   )

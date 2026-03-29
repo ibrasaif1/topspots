@@ -18,16 +18,17 @@ function isDarkMode(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-function getMarkerColors(highlighted: boolean) {
+function getMarkerColors(highlighted: boolean, popular: boolean) {
   const dark = isDarkMode()
+  const border = popular ? '#d97706' : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)')
   if (highlighted) {
     return dark
-      ? { bg: '#3b82f6', border: 'rgba(255,255,255,0.5)', text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
-      : { bg: 'rgba(59,130,246,0.75)', border: 'rgba(0,0,0,0.3)', text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+      ? { bg: '#3b82f6', border, text: '#ffffff', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+      : { bg: 'rgba(59,130,246,0.75)', border, text: '#ffffff', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
   }
   return dark
-    ? { bg: '#18181b', border: 'rgba(255,255,255,0.5)', text: '#fafafa', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
-    : { bg: 'rgba(255,255,255,0.65)', border: 'rgba(0,0,0,0.3)', text: '#18181b', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
+    ? { bg: '#18181b', border, text: '#fafafa', shadow: '0 1px 3px rgba(0,0,0,0.12)', innerHighlight: '' }
+    : { bg: 'rgba(255,255,255,0.65)', border, text: '#18181b', shadow: '0 2px 8px rgba(0,0,0,0.1)', innerHighlight: ', inset 0 1px 0 rgba(255,255,255,0.4)' }
 }
 
 function getCategoryForRestaurant(rating: number, reviews: number): CategoryId {
@@ -36,10 +37,11 @@ function getCategoryForRestaurant(rating: number, reviews: number): CategoryId {
   return 'on-the-come-up'
 }
 
-function createCategoryMarkerElement(category: CategoryId, highlighted = false): HTMLDivElement {
+function createCategoryMarkerElement(category: CategoryId, highlighted = false, popular = false): HTMLDivElement {
   const dark = isDarkMode()
-  const colors = getMarkerColors(highlighted)
+  const colors = getMarkerColors(highlighted, popular)
   const size = highlighted ? 38 : 34
+  const borderWidth = popular ? 2 : 1
   const div = document.createElement('div')
   div.style.cssText = `
     width: ${size}px;
@@ -50,7 +52,7 @@ function createCategoryMarkerElement(category: CategoryId, highlighted = false):
     border-radius: 9999px;
     background: ${colors.bg};
     ${dark ? '' : 'backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);'}
-    border: 1px solid ${colors.border};
+    border: ${borderWidth}px solid ${colors.border};
     box-shadow: ${colors.shadow}${colors.innerHighlight};
     color: ${colors.text};
     cursor: pointer;
@@ -144,6 +146,7 @@ function GoogleMapComponent({
     hideInfoWindow: () => void
     googleMapsUrl: string
     category: CategoryId
+    popular: boolean
   }>>(new Map())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null)
@@ -613,7 +616,8 @@ function GoogleMapComponent({
       }
 
       const category = getCategoryForRestaurant(restaurant.rating, restaurant.reviews)
-      const markerEl = createCategoryMarkerElement(category)
+      const popular = restaurant.reviews >= 10000
+      const markerEl = createCategoryMarkerElement(category, false, popular)
 
       // Don't set map — the clusterer manages map attachment
       const marker = new window.google.maps.marker.AdvancedMarkerElement({
@@ -724,6 +728,7 @@ function GoogleMapComponent({
         hideInfoWindow,
         googleMapsUrl,
         category,
+        popular,
       })
 
       restaurantMarkersRef.current.set(restaurant.place_id, marker)
@@ -864,7 +869,7 @@ function GoogleMapComponent({
       const isHovered = placeId === hoveredRestaurantId
 
       try {
-        const newContent = createCategoryMarkerElement(eventData.category, isHovered)
+        const newContent = createCategoryMarkerElement(eventData.category, isHovered, eventData.popular)
         marker.content = newContent
         marker.zIndex = isHovered ? 1000 : 1
 

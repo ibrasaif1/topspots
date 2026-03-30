@@ -418,7 +418,8 @@ function GoogleMapComponent({
       zoom: 4,
       minZoom: 3,
       disableDefaultUI: true,
-      gestureHandling: 'cooperative',
+      gestureHandling: 'greedy',
+      clickableIcons: false,
       mapId: "2ddce5326308b2176661a3da",
       colorScheme: colorScheme === 'dark' ? 'DARK' : 'LIGHT',
     })

@@ -182,7 +182,7 @@ function GoogleMap({ restaurants, hoveredRestaurant, onMarkerHover, city }: {
       fullscreenControl: false,
       mapTypeControl: false,
       zoomControl: true,
-      gestureHandling: 'cooperative',
+      gestureHandling: 'greedy',
       colorScheme: mapColorScheme === 'dark' ? 'DARK' : 'LIGHT',
     });
 

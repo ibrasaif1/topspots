@@ -18,7 +18,7 @@ import {
   matchesAnyCategory,
   getWidestFetchParams,
 } from "@/config/filters";
-import { Star, Home } from "lucide-react";
+import { Star, Home, FlaskConical } from "lucide-react";
 import { LEFT_SIDEBAR_FRACTION, RIGHT_SIDEBAR_FRACTION } from "@/lib/utils";
 
 type Restaurant = {
@@ -250,11 +250,14 @@ export default function Page() {
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden">
       {mockMode && (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-amber-400 text-amber-900 text-xs font-semibold text-center py-1">
-          MOCK MODE — Data is simulated
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center gap-2.5 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200/80 dark:border-amber-800/40">
+          <FlaskConical className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">MOCK MODE</span>
+          <span className="w-px h-3 bg-amber-300 dark:bg-amber-700 shrink-0" />
+          <span className="text-xs text-amber-700 dark:text-amber-400">Data is simulated</span>
         </div>
       )}
-      <div style={{ width: `${LEFT_SIDEBAR_FRACTION * 100}%` }} className={`absolute left-0 ${mockMode ? 'top-6' : 'top-0'} bottom-0 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
+      <div style={{ width: `${LEFT_SIDEBAR_FRACTION * 100}%` }} className={`absolute left-0 ${mockMode ? 'top-8' : 'top-0'} bottom-0 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
         <div className="w-full max-w-lg">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-6xl font-bold text-foreground">
@@ -510,16 +513,13 @@ export default function Page() {
               )}
             </div>
 
-            <Button 
-              onClick={() => { handleCollectPlaces(); setModalOpen(false); }} 
+            <Button
+              onClick={() => { handleCollectPlaces(); setModalOpen(false); }}
+              variant="outline"
               className="w-full"
               disabled={loading}
             >
               {loading ? 'Finding...' : 'Find TopSpots'}
-            </Button>
-
-            <Button onClick={() => setModalOpen(false)} variant="outline" className="w-full">
-              Close
             </Button>
           </div>
         </DialogContent>
@@ -531,14 +531,10 @@ export default function Page() {
             <DialogTitle>Welcome to TopSpots</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="py-4">
             <p className="text-muted-foreground dark:text-zinc-100">
               Check out places we&apos;ve already found, or add places in your own search area by defining a polygon
             </p>
-
-            <Button onClick={() => setHelpOpen(false)} className="w-full">
-              Got it!
-            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -528,12 +528,12 @@ export default function Page() {
             </div>
 
             <Button
-              onClick={() => { handleCollectPlaces(); setModalOpen(false); }}
               variant="outline"
-              className="w-full"
-              disabled={loading}
+              className="w-full opacity-50 cursor-not-allowed"
+              disabled={true}
+              title="Search is disabled in this demo"
             >
-              {loading ? 'Finding...' : 'Find TopSpots'}
+              Find TopSpots
             </Button>
           </div>
         </DialogContent>

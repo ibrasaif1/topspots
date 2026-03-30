@@ -36,6 +36,15 @@ function isDarkMode(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+type Point = { x: number; y: number }
+function sign(p1: Point, p2: Point, p3: Point) {
+  return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+}
+function isPointInTriangle(pt: Point, v1: Point, v2: Point, v3: Point): boolean {
+  const d1 = sign(pt, v1, v2), d2 = sign(pt, v2, v3), d3 = sign(pt, v3, v1)
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))
+}
+
 function getMarkerColors(highlighted: boolean, popular: boolean) {
   const dark = isDarkMode()
   const border = popular ? THEME.popularBorder : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)')
@@ -161,15 +170,14 @@ function GoogleMapComponent({
   const clustererRef = useRef<MarkerClusterer | null>(null)
   const markerEventDataRef = useRef<Map<string, {
     showInfoWindow: () => void
-    hideInfoWindow: () => void
+    hideInfoWindow: (e?: MouseEvent) => void
     googleMapsUrl: string
     category: CategoryId
     popular: boolean
   }>>(new Map())
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const infoWindowRef = useRef<any>(null)
-  const infoWindowCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isHoveringInfoWindowRef = useRef<boolean>(false)
+  const safeTriangleMoveHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const sidebarHoverActiveRef = useRef<boolean>(false)
   const prevHoveredIdRef = useRef<string | null>(null)
   const zoomRef = useRef<number>(zoom ?? 0)
@@ -679,53 +687,76 @@ function GoogleMapComponent({
       const showInfoWindow = () => {
         if (zoomRef.current < 10) return
 
-        // Clear any pending close timeout
-        if (infoWindowCloseTimeoutRef.current) {
-          clearTimeout(infoWindowCloseTimeoutRef.current)
-          infoWindowCloseTimeoutRef.current = null
+        // Cancel any active safe-triangle tracking from a previous marker
+        if (safeTriangleMoveHandlerRef.current) {
+          document.removeEventListener('mousemove', safeTriangleMoveHandlerRef.current)
+          safeTriangleMoveHandlerRef.current = null
         }
 
         if (!infoWindowRef.current) {
-          infoWindowRef.current = new window.google.maps.InfoWindow({ zIndex: 2000 })
+          infoWindowRef.current = new window.google.maps.InfoWindow({ zIndex: 2000, disableAutoPan: false })
         }
         infoWindowRef.current.setContent(content)
         infoWindowRef.current.open(mapInstanceRef.current, marker)
-
-        // Add hover listeners to info window content after it opens
-        setTimeout(() => {
-          const infoWindowContent = document.querySelector('.gm-style-iw-c')
-          if (infoWindowContent) {
-            infoWindowContent.addEventListener('mouseenter', () => {
-              isHoveringInfoWindowRef.current = true
-              if (infoWindowCloseTimeoutRef.current) {
-                clearTimeout(infoWindowCloseTimeoutRef.current)
-                infoWindowCloseTimeoutRef.current = null
-              }
-            })
-            infoWindowContent.addEventListener('mouseleave', () => {
-              isHoveringInfoWindowRef.current = false
-              scheduleCloseInfoWindow()
-            })
-          }
-        }, 10)
       }
 
-      const scheduleCloseInfoWindow = () => {
-        // Don't close while sidebar hover is active
+      const hideInfoWindow = (e?: MouseEvent) => {
         if (sidebarHoverActiveRef.current) return
-        // Only schedule close if not already scheduled
-        if (infoWindowCloseTimeoutRef.current) return
 
-        infoWindowCloseTimeoutRef.current = setTimeout(() => {
-          if (!isHoveringInfoWindowRef.current && !sidebarHoverActiveRef.current && infoWindowRef.current) {
-            infoWindowRef.current.close()
+        // Programmatic call (sidebar un-hover, no mouse event) — close immediately
+        if (!e) {
+          if (infoWindowRef.current) infoWindowRef.current.close()
+          return
+        }
+
+        // Mouse-triggered — use safe triangle to keep IW open while cursor travels toward it
+        const iwEl = document.querySelector('.gm-style-iw-c')
+        if (!iwEl || !infoWindowRef.current?.isOpen) {
+          if (infoWindowRef.current) infoWindowRef.current.close()
+          return
+        }
+
+        const exitPos = { x: e.clientX, y: e.clientY }
+        const rect = iwEl.getBoundingClientRect()
+        const triA = exitPos
+        const triB = { x: rect.left, y: rect.bottom }
+        const triC = { x: rect.right, y: rect.bottom }
+
+        let arrivedAtIW = false
+
+        const onMouseMove = (ev: MouseEvent) => {
+          const cursor = { x: ev.clientX, y: ev.clientY }
+          const freshRect = iwEl.getBoundingClientRect()
+          const insideIW =
+            cursor.x >= freshRect.left && cursor.x <= freshRect.right &&
+            cursor.y >= freshRect.top && cursor.y <= freshRect.bottom
+
+          if (insideIW) {
+            arrivedAtIW = true
+            return // Cursor is on the infowindow — stay open
           }
-          infoWindowCloseTimeoutRef.current = null
-        }, 500) // Small delay to allow cursor to move to info window
-      }
 
-      const hideInfoWindow = () => {
-        scheduleCloseInfoWindow()
+          if (arrivedAtIW) {
+            // Cursor was on infowindow and has now left — close
+            cleanup()
+            if (infoWindowRef.current) infoWindowRef.current.close()
+            return
+          }
+
+          if (!isPointInTriangle(cursor, triA, triB, triC)) {
+            // Cursor has left the safe triangle without reaching IW — close immediately
+            cleanup()
+            if (infoWindowRef.current) infoWindowRef.current.close()
+          }
+        }
+
+        const cleanup = () => {
+          document.removeEventListener('mousemove', onMouseMove)
+          safeTriangleMoveHandlerRef.current = null
+        }
+
+        safeTriangleMoveHandlerRef.current = onMouseMove
+        document.addEventListener('mousemove', onMouseMove)
       }
 
       // Add hover and click listeners
@@ -858,11 +889,10 @@ function GoogleMapComponent({
       if (infoWindowRef.current) {
         infoWindowRef.current.close()
       }
-      if (infoWindowCloseTimeoutRef.current) {
-        clearTimeout(infoWindowCloseTimeoutRef.current)
-        infoWindowCloseTimeoutRef.current = null
+      if (safeTriangleMoveHandlerRef.current) {
+        document.removeEventListener('mousemove', safeTriangleMoveHandlerRef.current)
+        safeTriangleMoveHandlerRef.current = null
       }
-      isHoveringInfoWindowRef.current = false
     }
   }, [restaurants, colorScheme])
 

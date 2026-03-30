@@ -644,7 +644,7 @@ function GoogleMapComponent({
               r.gps_coordinates.latitude,
               r.gps_coordinates.longitude
             ),
-            weight: r.reviews,
+            weight: 1,
           }))
       }
 

@@ -667,7 +667,7 @@ function GoogleMapComponent({
 
       return () => {
         if (boundsTimeout) clearTimeout(boundsTimeout)
-        window.google.maps.event.removeListener(boundsListener)
+        boundsListener.remove()
         if (heatmapRef.current) {
           heatmapRef.current.setMap(null)
           heatmapRef.current = null

@@ -18,7 +18,8 @@ import {
   matchesAnyCategory,
   getWidestFetchParams,
 } from "@/config/filters";
-import { Star, Home, FlaskConical } from "lucide-react";
+import { Star, Home, FlaskConical, Flame } from "lucide-react";
+import { Toggle } from "@/components/ui/toggle";
 import { LEFT_SIDEBAR_FRACTION, RIGHT_SIDEBAR_FRACTION } from "@/lib/utils";
 
 type Restaurant = {
@@ -55,6 +56,7 @@ export default function Page() {
   const [hoveredRestaurantId, setHoveredRestaurantId] = useState<string | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<CategoryId[]>(DEFAULT_SELECTED_CATEGORIES);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
   
@@ -305,6 +307,17 @@ export default function Page() {
               onChange={setSelectedCategories}
             />
 
+            <Toggle
+              pressed={showHeatmap}
+              onPressedChange={setShowHeatmap}
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+            >
+              <Flame className="w-4 h-4" />
+              Heatmap
+            </Toggle>
+
             {location && (
               <div className={`p-4 border rounded-lg ${
                 polygon.length === 4 && isPolygonValid
@@ -372,6 +385,7 @@ export default function Page() {
           rightSidebarVisible={showRestaurantList}
           resetView={resetView}
           onViewReset={() => setResetView(false)}
+          showHeatmap={showHeatmap}
         />
       </div>
 

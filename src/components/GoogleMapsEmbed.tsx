@@ -117,6 +117,7 @@ interface GoogleMapsEmbedProps {
   rightSidebarVisible?: boolean
   resetView?: boolean
   onViewReset?: () => void
+  showHeatmap?: boolean
 }
 
 function GoogleMapComponent({
@@ -135,6 +136,7 @@ function GoogleMapComponent({
   rightSidebarVisible,
   resetView,
   onViewReset,
+  showHeatmap,
 }: {
   location?: string
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
@@ -159,6 +161,7 @@ function GoogleMapComponent({
   rightSidebarVisible?: boolean
   resetView?: boolean
   onViewReset?: () => void
+  showHeatmap?: boolean
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,6 +197,8 @@ function GoogleMapComponent({
   const rebuildMarkersRef = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getPolygonColorsRef = useRef<any>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const heatmapRef = useRef<any>(null)
   useEffect(() => { zoomRef.current = zoom ?? 0 }, [zoom])
   useEffect(() => { rightSidebarVisibleRef.current = rightSidebarVisible ?? false }, [rightSidebarVisible])
   useEffect(() => { isLockedRef.current = isLocked }, [isLocked])
@@ -619,6 +624,57 @@ function GoogleMapComponent({
     restaurantMarkersRef.current.clear()
     markerEventDataRef.current.clear()
 
+    // Clear old heatmap
+    if (heatmapRef.current) {
+      heatmapRef.current.setMap(null)
+      heatmapRef.current = null
+    }
+
+    if (showHeatmap) {
+      const getVisibleHeatmapData = () => {
+        const mapBounds = mapInstanceRef.current.getBounds()
+        return restaurants
+          .filter(r => {
+            if (!r.gps_coordinates?.latitude || !r.gps_coordinates?.longitude) return false
+            if (!mapBounds) return true
+            return mapBounds.contains({ lat: r.gps_coordinates.latitude, lng: r.gps_coordinates.longitude })
+          })
+          .map(r => ({
+            location: new window.google.maps.LatLng(
+              r.gps_coordinates.latitude,
+              r.gps_coordinates.longitude
+            ),
+            weight: r.reviews,
+          }))
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      heatmapRef.current = new (window.google.maps as any).visualization.HeatmapLayer({
+        data: getVisibleHeatmapData(),
+        map: mapInstanceRef.current,
+        radius: 30,
+      })
+
+      let boundsTimeout: NodeJS.Timeout | null = null
+      const boundsListener = mapInstanceRef.current.addListener('bounds_changed', () => {
+        if (boundsTimeout) clearTimeout(boundsTimeout)
+        boundsTimeout = setTimeout(() => {
+          if (heatmapRef.current) {
+            heatmapRef.current.setData(getVisibleHeatmapData())
+          }
+        }, 150)
+      })
+
+      return () => {
+        if (boundsTimeout) clearTimeout(boundsTimeout)
+        window.google.maps.event.removeListener(boundsListener)
+        if (heatmapRef.current) {
+          heatmapRef.current.setMap(null)
+          heatmapRef.current = null
+        }
+      }
+    }
+
     const escapeHtml = (value: string) =>
       value.replace(/[&<>"']/g, (char) => {
         switch (char) {
@@ -785,78 +841,76 @@ function GoogleMapComponent({
       allMarkers.push(marker)
     })
 
-    // Custom cluster renderer — adapts to light/dark mode
-    const dark = isDarkMode()
+    // Custom cluster renderer — 3-ring Google-style halo
     const clusterRenderer: Renderer = {
       render({ count, position }) {
-        const size = Math.min(54, 34 + Math.log2(count) * 5)
-        const div = document.createElement('div')
+        const innerSize = Math.min(46, 30 + Math.log2(count) * 4)
+        const midSize = innerSize + 14
+        const outerSize = innerSize + 28
 
-        if (dark) {
-          div.style.cssText = `
-            width: ${size}px;
-            height: ${size}px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 9999px;
-            background: ${THEME.zinc900};
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-            border: 1px solid rgba(255,255,255,0.5);
-            color: ${THEME.zinc50};
-            font-size: 13px;
-            font-weight: 500;
-            letter-spacing: -0.01em;
-            cursor: pointer;
-            transform: translateY(${size / 2}px);
-            transition: background 0.15s ease, border-color 0.15s ease;
-            user-select: none;
-          `
-          div.addEventListener('mouseenter', () => {
-            div.style.background = THEME.zinc800
-            div.style.borderColor = 'rgba(255,255,255,0.6)'
-          })
-          div.addEventListener('mouseleave', () => {
-            div.style.background = THEME.zinc900
-            div.style.borderColor = 'rgba(255,255,255,0.5)'
-          })
-        } else {
-          div.style.cssText = `
-            width: ${size}px;
-            height: ${size}px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 9999px;
-            background: rgba(255,255,255,0.65);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
-            border: 1px solid rgba(0,0,0,0.3);
-            color: ${THEME.zinc900};
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: -0.01em;
-            cursor: pointer;
-            transform: translateY(${size / 2}px);
-            transition: background 0.15s ease, box-shadow 0.15s ease;
-            user-select: none;
-          `
-          div.addEventListener('mouseenter', () => {
-            div.style.background = 'rgba(255,255,255,0.8)'
-            div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)'
-          })
-          div.addEventListener('mouseleave', () => {
-            div.style.background = 'rgba(255,255,255,0.65)'
-            div.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4)'
-          })
-        }
+        const outer = document.createElement('div')
+        outer.style.cssText = `
+          width: ${outerSize}px;
+          height: ${outerSize}px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 9999px;
+          background: rgba(37, 99, 235, 0.12);
+          cursor: pointer;
+          transform: translateY(${outerSize / 2}px);
+          user-select: none;
+          transition: background 0.15s ease;
+        `
 
-        div.textContent = String(count)
+        const mid = document.createElement('div')
+        mid.style.cssText = `
+          width: ${midSize}px;
+          height: ${midSize}px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 9999px;
+          background: rgba(37, 99, 235, 0.25);
+          transition: background 0.15s ease;
+        `
+
+        const inner = document.createElement('div')
+        inner.style.cssText = `
+          width: ${innerSize}px;
+          height: ${innerSize}px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 9999px;
+          background: ${THEME.accent};
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
+          transition: background 0.15s ease, box-shadow 0.15s ease;
+        `
+        inner.textContent = String(count)
+        mid.appendChild(inner)
+        outer.appendChild(mid)
+
+        outer.addEventListener('mouseenter', () => {
+          outer.style.background = 'rgba(37, 99, 235, 0.18)'
+          mid.style.background = 'rgba(37, 99, 235, 0.35)'
+          inner.style.background = '#1d4ed8'
+          inner.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.55)'
+        })
+        outer.addEventListener('mouseleave', () => {
+          outer.style.background = 'rgba(37, 99, 235, 0.12)'
+          mid.style.background = 'rgba(37, 99, 235, 0.25)'
+          inner.style.background = THEME.accent
+          inner.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.45)'
+        })
 
         return new window.google.maps.marker.AdvancedMarkerElement({
           position,
-          content: div,
+          content: outer,
           zIndex: 999999 + count,
         })
       },
@@ -895,7 +949,7 @@ function GoogleMapComponent({
         safeTriangleMoveHandlerRef.current = null
       }
     }
-  }, [restaurants, colorScheme])
+  }, [restaurants, colorScheme, showHeatmap])
 
   // Handle marker highlighting when hoveredRestaurantId changes
   useEffect(() => {
@@ -977,13 +1031,14 @@ export default function GoogleMapsEmbed({
   rightSidebarVisible,
   resetView,
   onViewReset,
+  showHeatmap,
 }: GoogleMapsEmbedProps) {
   return (
     <Wrapper
       apiKey={process.env.NODE_ENV === 'production'
         ? process.env.NEXT_PUBLIC_FRONTEND_API_KEY || ''
         : process.env.NEXT_PUBLIC_DEV_KEY || process.env.NEXT_PUBLIC_FRONTEND_API_KEY || ''}
-      libraries={["marker"]}
+      libraries={["marker", "visualization"]}
       render={() => <div />}
     >
       <GoogleMapComponent
@@ -1002,6 +1057,7 @@ export default function GoogleMapsEmbed({
         rightSidebarVisible={rightSidebarVisible}
         resetView={resetView}
         onViewReset={onViewReset}
+        showHeatmap={showHeatmap}
       />
     </Wrapper>
   )

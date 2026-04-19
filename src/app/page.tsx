@@ -18,7 +18,8 @@ import {
   matchesAnyCategory,
   getWidestFetchParams,
 } from "@/config/filters";
-import { Star, Home, FlaskConical, Flame } from "lucide-react";
+import { Star, Home, FlaskConical, Flame, Sun, Moon, CircleDotDashed } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Toggle } from "@/components/ui/toggle";
 import { LEFT_SIDEBAR_FRACTION, RIGHT_SIDEBAR_FRACTION } from "@/lib/utils";
 
@@ -43,12 +44,12 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [priceDialogOpen, setPriceDialogOpen] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [placeCount, setPlaceCount] = useState<number | null>(null);
   const [clearPolygon, setClearPolygon] = useState(false);
   const [resetView, setResetView] = useState(false);
   const [mockMode, setMockMode] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{ used: number; limit: number } | null>(null);
   
   // Viewport tracking state
   const [zoom, setZoom] = useState<number>(4);
@@ -57,8 +58,13 @@ export default function Page() {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<CategoryId[]>(DEFAULT_SELECTED_CATEGORIES);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showClusters, setShowClusters] = useState(true);
+
+  const canToggleClusters = zoom >= ZOOM_THRESHOLD && !showHeatmap;
+  const effectiveClusters = canToggleClusters ? showClusters : !showHeatmap;
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+  const { resolvedTheme, setTheme } = useTheme();
   
   // Handlers for map viewport changes
   const handleZoomChange = useCallback((newZoom: number) => {
@@ -146,23 +152,6 @@ export default function Page() {
     fetchRestaurants();
   }, [apiUrl]);
 
-  // Close price panel when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (priceDialogOpen && !target.closest('[data-price-panel]')) {
-        setPriceDialogOpen(false);
-      }
-    };
-
-    if (priceDialogOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [priceDialogOpen]);
-
   const handleCountCall = async () => {
     setLoading(true);
 
@@ -182,6 +171,7 @@ export default function Page() {
       if (response.ok) {
         setPlaceCount(data.count);
         if (data.mock) setMockMode(true);
+        if (data.usage) setUsageInfo(data.usage);
         setModalOpen(true);
       } else {
         alert(`Error: ${data.error || 'Failed to get count'}`);
@@ -250,7 +240,14 @@ export default function Page() {
   }
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 relative overflow-hidden">
+    <div className="flex h-screen bg-background relative overflow-hidden">
+      <button
+        onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+        className="absolute top-3 left-3 z-50 w-8 h-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+        aria-label="Toggle theme"
+      >
+        {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
       {mockMode && (
         <div className="absolute top-0 left-0 right-0 z-50 flex items-center gap-2.5 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200/80 dark:border-amber-800/40">
           <FlaskConical className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -259,7 +256,7 @@ export default function Page() {
           <span className="text-xs text-amber-700 dark:text-amber-400">Data is simulated</span>
         </div>
       )}
-      <div style={{ width: `${LEFT_SIDEBAR_FRACTION * 100}%` }} className={`absolute left-0 ${mockMode ? 'top-8' : 'top-0'} bottom-0 p-8 bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-white/20 dark:border-zinc-700/40 z-10 flex items-center justify-center`}>
+      <div style={{ width: `${LEFT_SIDEBAR_FRACTION * 100}%` }} className={`absolute left-0 ${mockMode ? 'top-8' : 'top-0'} bottom-0 p-8 bg-white/10 dark:bg-[oklch(0.103_0.021_268)]/80 backdrop-blur-xl border-r border-black/10 dark:border-primary/40 z-10 flex items-center justify-center`}>
         <div className="w-full max-w-lg">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-6xl font-bold text-foreground">
@@ -298,7 +295,7 @@ export default function Page() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Enter city or address..."
-                className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground dark:bg-zinc-800/60 dark:border-zinc-600 dark:text-white dark:placeholder-zinc-500"
+                className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground dark:bg-secondary/60 dark:border-border dark:text-foreground dark:placeholder-muted-foreground"
               />
             </div>
 
@@ -307,16 +304,29 @@ export default function Page() {
               onChange={setSelectedCategories}
             />
 
-            <Toggle
-              pressed={showHeatmap}
-              onPressedChange={setShowHeatmap}
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-            >
-              <Flame className="w-4 h-4" />
-              Heatmap
-            </Toggle>
+            <div className="flex gap-2">
+              <Toggle
+                pressed={showHeatmap}
+                onPressedChange={(on) => { setShowHeatmap(on); if (on) setShowClusters(false); }}
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-2 cursor-pointer border-zinc-400 dark:border-zinc-500 hover:bg-gradient-to-r hover:from-orange-500 hover:to-red-600 hover:text-white hover:border-orange-500 dark:hover:border-orange-500 data-[state=on]:bg-gradient-to-r data-[state=on]:from-orange-500 data-[state=on]:to-red-600 data-[state=on]:text-white data-[state=on]:border-orange-500"
+              >
+                <Flame className="w-4 h-4" />
+                Heatmap
+              </Toggle>
+              <Toggle
+                pressed={showClusters}
+                onPressedChange={setShowClusters}
+                disabled={!canToggleClusters}
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-2 cursor-pointer border-zinc-400 dark:border-zinc-500"
+              >
+                <CircleDotDashed className="w-4 h-4" />
+                Clusters
+              </Toggle>
+            </div>
 
             {location && (
               <div className={`p-4 border rounded-lg ${
@@ -386,6 +396,8 @@ export default function Page() {
           resetView={resetView}
           onViewReset={() => setResetView(false)}
           showHeatmap={showHeatmap}
+          showClusters={effectiveClusters}
+          theme={resolvedTheme as 'light' | 'dark' | undefined}
         />
       </div>
 
@@ -394,15 +406,15 @@ export default function Page() {
         style={{ width: `${RIGHT_SIDEBAR_FRACTION * 100}%` }}
         className={`
           absolute right-0 top-0 bottom-0
-          bg-white/10 dark:bg-zinc-900/80 backdrop-blur-xl
-          border-l border-white/20 dark:border-zinc-700/40
+          bg-white/10 dark:bg-[oklch(0.103_0.021_268)]/80 backdrop-blur-xl
+          border-l border-black/10 dark:border-primary/40
           transition-transform duration-300 ease-out
           ${showRestaurantList ? 'translate-x-0' : 'translate-x-full'}
           z-20 flex flex-col
         `}
       >
         {/* Panel Header */}
-        <div className="p-4 border-b border-white/20 dark:border-zinc-700/40">
+        <div className="p-4 border-b border-black/10 dark:border-primary/40">
           <h2 className="text-lg font-semibold text-foreground">
             {selectedCategories.length === 1 && selectedCategories[0] === 'topspots'
               ? 'TopSpots in View'
@@ -428,8 +440,8 @@ export default function Page() {
                     relative p-3 rounded-lg border cursor-pointer
                     transition-all duration-150 ease-out
                     ${isHovered
-                      ? 'bg-white/40 border-white/60 shadow-md dark:bg-zinc-700/60 dark:border-zinc-500/60 dark:shadow-lg dark:shadow-black/30'
-                      : 'bg-white/20 border-white/30 hover:bg-white/30 hover:border-white/50 dark:bg-zinc-800/40 dark:border-zinc-700/40 dark:hover:bg-zinc-700/50 dark:hover:border-zinc-600/50'
+                      ? 'bg-white/40 border-black/20 shadow-md dark:bg-primary/40 dark:border-primary/70 dark:shadow-lg dark:shadow-black/40'
+                      : 'bg-white/20 border-black/10 hover:bg-white/35 hover:border-black/20 dark:bg-[oklch(0.108_0.020_270)]/60 dark:border-primary/30 dark:hover:bg-secondary/60 dark:hover:border-primary/55'
                     }
                   `}
                   onMouseEnter={() => {
@@ -469,7 +481,7 @@ export default function Page() {
                   </div>
                   
                   {restaurant.priceRange && (
-                    <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-300">
+                    <div className="mt-2 text-xs text-muted-foreground">
                       {restaurant.priceRange}
                     </div>
                   )}
@@ -499,39 +511,46 @@ export default function Page() {
               <p className="text-sm text-muted-foreground text-center mt-1">
                 places found in this area
               </p>
-
-              {placeCount !== null && placeCount > 0 && !mockMode && (
-                <div className="mt-3 pt-3 border-t border-blue-200">
-                  <div className="flex flex-col items-center">
-                    <p className="text-lg font-semibold text-foreground">
-                      ${((placeCount * 0.02) * 1.029 + 0.30).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center mt-1">cost</p>
-                    <div className="relative" data-price-panel>
-                      <button
-                        onClick={() => setPriceDialogOpen(!priceDialogOpen)}
-                        className="text-xs text-accent hover:text-accent/80 underline mt-1"
-                        data-price-panel
-                      >
-                        why so expensive?
-                      </button>
-                      {priceDialogOpen && (
-                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 w-48 p-3 bg-zinc-800 text-white text-xs rounded-lg shadow-lg z-50" data-price-panel>
-                          <p>Google Maps API charges $0.02 per place, and we add a 2.9% fee + $0.30 for Stripe processing.</p>
-                          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-800"></div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {usageInfo && !mockMode && (() => {
+              const { used, limit } = usageInfo;
+              const count = placeCount ?? 0;
+              const afterSearch = used + count;
+              const overLimit = afterSearch > limit;
+              const overBy = afterSearch - limit;
+              const pct = Math.min((used / limit) * 100, 100);
+              const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
+              return (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Monthly API usage</span>
+                    <span className="font-medium text-foreground">{used.toLocaleString()} / {limit.toLocaleString()} free calls</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  {count > 0 && (
+                    overLimit ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        ⚠ This search uses ~{count} calls — {overBy} over your free tier
+                      </p>
+                    ) : (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                        ✓ This search uses ~{count} calls — fits within your free tier
+                      </p>
+                    )
+                  )}
+                </div>
+              );
+            })()}
 
             <Button
               variant="outline"
-              className="w-full opacity-50 cursor-not-allowed"
-              disabled={true}
-              title="Search is disabled in this demo"
+              className={`w-full ${!process.env.NEXT_PUBLIC_DEV_KEY ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!process.env.NEXT_PUBLIC_DEV_KEY}
+              title={!process.env.NEXT_PUBLIC_DEV_KEY ? "Search is disabled in this demo" : undefined}
+              onClick={process.env.NEXT_PUBLIC_DEV_KEY ? handleCollectPlaces : undefined}
             >
               Find TopSpots
             </Button>
@@ -546,7 +565,7 @@ export default function Page() {
           </DialogHeader>
 
           <div className="py-4">
-            <p className="text-muted-foreground dark:text-zinc-100">
+            <p className="text-muted-foreground">
               Check out places we&apos;ve already found, or add places in your own search area by defining a polygon
             </p>
           </div>

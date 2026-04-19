@@ -43,13 +43,12 @@ export default function CategoryFilter({ selected, onChange }: CategoryFilterPro
           className={cn(
             "flex-1 rounded-full px-2 py-2 text-xs whitespace-nowrap font-medium",
             "cursor-pointer transition-transform duration-200 ease-out",
-            "border border-zinc-300 bg-zinc-100 shadow-[0_3px_0_0_var(--shadow-outline)]",
+            "border border-zinc-400 bg-zinc-100 shadow-[0_3px_0_0_var(--shadow-outline)]",
             "hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-[0_1px_0_0_var(--shadow-outline)]",
-            "dark:bg-zinc-800 dark:border-zinc-600 dark:text-zinc-200 dark:shadow-[0_3px_0_0_var(--shadow-outline)]",
+            "dark:bg-zinc-800 dark:border-zinc-500 dark:text-zinc-200 dark:shadow-[0_3px_0_0_var(--shadow-outline)]",
             "dark:active:shadow-[0_1px_0_0_var(--shadow-outline)]",
-            "data-[state=on]:translate-y-0.5 data-[state=on]:shadow-[0_1px_0_0_var(--shadow-primary)]",
-            "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary",
-            "dark:data-[state=on]:bg-primary dark:data-[state=on]:text-primary-foreground dark:data-[state=on]:border-primary dark:data-[state=on]:shadow-[0_1px_0_0_var(--shadow-primary)]",
+            "data-[state=on]:translate-y-0.5 data-[state=on]:shadow-[0_1px_0_0_var(--shadow-outline)] data-[state=on]:text-foreground data-[state=on]:bg-zinc-100 data-[state=on]:border-zinc-500",
+            "dark:data-[state=on]:shadow-[0_1px_0_0_var(--shadow-outline)] dark:data-[state=on]:text-zinc-100 dark:data-[state=on]:bg-zinc-700 dark:data-[state=on]:border-zinc-400",
           )}
         >
           {CATEGORY_ICONS[cat.id]} {cat.label}

@@ -1,29 +1,30 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --accent: #2563EB;
-  --accent-foreground: #ffffff;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #2563EB;
-  --card: #ffffff;
-  --card-foreground: #18181b;
-  --popover: #ffffff;
-  --popover-foreground: #18181b;
-  --shadow-primary: #18181b;
-  --shadow-outline: #d4d4d8;
-  --shadow-destructive: #991b1b;
+  --background: oklch(0.906 0 0);
+  --foreground: oklch(0.071 0 0);
+  --primary: oklch(0.640 0.200 264);
+  --primary-foreground: oklch(0.906 0 0);
+  --accent: oklch(0.640 0.200 264);
+  --accent-foreground: oklch(0.906 0 0);
+  --secondary: oklch(0.845 0.009 280);
+  --secondary-foreground: oklch(0.071 0 0);
+  --muted: oklch(0.864 0.009 277);
+  --muted-foreground: oklch(0.375 0.022 274);
+  --destructive: oklch(0.628 0.258 29);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.770 0.012 280);
+  --input: oklch(0.864 0.009 277);
+  --ring: oklch(0.640 0.200 264);
+  --card: oklch(0.949 0 0);
+  --card-foreground: oklch(0.071 0 0);
+  --popover: oklch(0.949 0 0);
+  --popover-foreground: oklch(0.071 0 0);
+  --shadow-primary: oklch(0.071 0 0);
+  --shadow-outline: oklch(0.770 0.012 280);
+  --shadow-destructive: oklch(0.396 0.141 26);
 }
 
 @theme inline {
@@ -51,48 +52,73 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-    --primary: #fafafa;
-    --primary-foreground: #09090b;
-    --accent: #2563EB;
-    --accent-foreground: #ffffff;
-    --secondary: #27272a;
-    --secondary-foreground: #fafafa;
-    --muted: #27272a;
-    --muted-foreground: #a1a1aa;
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: #27272a;
-    --input: #27272a;
-    --ring: #2563EB;
-    --card: #18181b;
-    --card-foreground: #fafafa;
-    --popover: #18181b;
-    --popover-foreground: #fafafa;
-    --shadow-primary: #a1a1aa;
-    --shadow-outline: #27272a;
-    --shadow-destructive: #991b1b;
+  :root:not(.light) {
+    --background: oklch(0.071 0 0);
+    --foreground: oklch(0.906 0 0);
+    --primary: oklch(0.640 0.200 264);
+    --primary-foreground: oklch(0.906 0 0);
+    --accent: oklch(0.640 0.200 264);
+    --accent-foreground: oklch(0.906 0 0);
+    --secondary: oklch(0.165 0.038 264);
+    --secondary-foreground: oklch(0.906 0 0);
+    --muted: oklch(0.165 0.038 264);
+    --muted-foreground: oklch(0.601 0.045 253);
+    --destructive: oklch(0.628 0.258 29);
+    --destructive-foreground: oklch(1 0 0);
+    --border: oklch(0.252 0.074 264);
+    --input: oklch(0.165 0.038 264);
+    --ring: oklch(0.640 0.200 264);
+    --card: oklch(0.109 0.014 270);
+    --card-foreground: oklch(0.906 0 0);
+    --popover: oklch(0.109 0.014 270);
+    --popover-foreground: oklch(0.906 0 0);
+    --shadow-primary: oklch(0.601 0.045 253);
+    --shadow-outline: oklch(0.252 0.074 264);
+    --shadow-destructive: oklch(0.396 0.141 26);
   }
+}
 
-  /* Refined dark scrollbars */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(113, 113, 122, 0.25) transparent;
-  }
+.dark {
+  --background: oklch(0.071 0 0);
+  --foreground: oklch(0.906 0 0);
+  --primary: oklch(0.640 0.200 264);
+  --primary-foreground: oklch(0.906 0 0);
+  --accent: oklch(0.640 0.200 264);
+  --accent-foreground: oklch(0.906 0 0);
+  --secondary: oklch(0.165 0.038 264);
+  --secondary-foreground: oklch(0.906 0 0);
+  --muted: oklch(0.165 0.038 264);
+  --muted-foreground: oklch(0.601 0.045 253);
+  --destructive: oklch(0.628 0.258 29);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.252 0.074 264);
+  --input: oklch(0.165 0.038 264);
+  --ring: oklch(0.640 0.200 264);
+  --card: oklch(0.109 0.014 270);
+  --card-foreground: oklch(0.906 0 0);
+  --popover: oklch(0.109 0.014 270);
+  --popover-foreground: oklch(0.906 0 0);
+  --shadow-primary: oklch(0.601 0.045 253);
+  --shadow-outline: oklch(0.252 0.074 264);
+  --shadow-destructive: oklch(0.396 0.141 26);
+}
 
-  /* Google Maps InfoWindow dark surface */
-  .gm-style-iw-c {
-    background: #1c1c1f !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(63,63,70,0.4) !important;
-  }
-  .gm-style-iw-tc::after {
-    background: #1c1c1f !important;
-  }
-  .gm-style .gm-style-iw-d {
-    color: #fafafa !important;
-  }
+/* Refined dark scrollbars */
+.dark * {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.546 0.213 264 / 0.4) transparent;
+}
+
+/* Google Maps InfoWindow dark surface */
+.dark .gm-style-iw-c {
+  background: oklch(0.109 0.014 270) !important;
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.546 0.213 264 / 0.4) !important;
+}
+.dark .gm-style-iw-tc::after {
+  background: oklch(0.109 0.014 270) !important;
+}
+.dark .gm-style .gm-style-iw-d {
+  color: oklch(0.982 0 0) !important;
 }
 
 body {

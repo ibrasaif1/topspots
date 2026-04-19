@@ -33,7 +33,7 @@ const CATEGORY_ICON_SVGS: Record<CategoryId, string> = {
 }
 
 function isDarkMode(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 }
 
 type Point = { x: number; y: number }
@@ -118,6 +118,8 @@ interface GoogleMapsEmbedProps {
   resetView?: boolean
   onViewReset?: () => void
   showHeatmap?: boolean
+  showClusters?: boolean
+  theme?: 'light' | 'dark'
 }
 
 function GoogleMapComponent({
@@ -137,6 +139,8 @@ function GoogleMapComponent({
   resetView,
   onViewReset,
   showHeatmap,
+  showClusters,
+  theme,
 }: {
   location?: string
   onPolygonChange?: (polygon: {lat: number, lng: number}[]) => void
@@ -162,6 +166,8 @@ function GoogleMapComponent({
   resetView?: boolean
   onViewReset?: () => void
   showHeatmap?: boolean
+  showClusters?: boolean
+  theme?: 'light' | 'dark'
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -206,15 +212,20 @@ function GoogleMapComponent({
   useEffect(() => { onPolygonValidationRef.current = onPolygonValidation }, [onPolygonValidation])
   useEffect(() => { onZoomChangeRef.current = onZoomChange }, [onZoomChange])
   useEffect(() => { onBoundsChangeRef.current = onBoundsChange }, [onBoundsChange])
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(() =>
-    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  )
+  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>(() => {
+    if (theme) return theme
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
   useEffect(() => {
+    if (theme) {
+      setColorScheme(theme)
+      return
+    }
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = (e: MediaQueryListEvent) => setColorScheme(e.matches ? 'dark' : 'light')
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
-  }, [])
+  }, [theme])
   const [coordinates, setCoordinates] = useState<{lat: number, lng: number} | null>(null)
   const [polygonPoints, setPolygonPoints] = useState<{lat: number, lng: number}[]>([])
 
@@ -414,13 +425,42 @@ function GoogleMapComponent({
   }, [isLocked, onPolygonChange, onPolygonValidation, createMarkerElement, getPolygonColors])
   rebuildMarkersRef.current = rebuildMarkers
 
-  // Initialize map once
+  // Initialize map (recreates when colorScheme changes since it's constructor-only)
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps || mapInstanceRef.current) return
+    if (!mapRef.current || !window.google?.maps) return
+
+    // Preserve position when recreating for a color scheme change
+    let savedCenter: { lat: number; lng: number } = { lat: 35, lng: 240 }
+    let savedZoom = 4
+    if (mapInstanceRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prev = mapInstanceRef.current as any
+      const center = prev.getCenter()
+      if (center) savedCenter = { lat: center.lat(), lng: center.lng() }
+      savedZoom = prev.getZoom() ?? 4
+      // Clean up previous map
+      markersRef.current.forEach(marker => marker.setMap(null))
+      markersRef.current = []
+      if (polygonRef.current) {
+        polygonRef.current.setMap(null)
+        polygonRef.current = null
+      }
+      if (clustererRef.current) {
+        clustererRef.current.clearMarkers()
+        clustererRef.current = null
+      }
+      restaurantMarkersRef.current.clear()
+      markerEventDataRef.current.clear()
+      if (heatmapRef.current) {
+        heatmapRef.current.setMap(null)
+        heatmapRef.current = null
+      }
+      mapInstanceRef.current = null
+    }
 
     const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 35, lng: 240 },
-      zoom: 4,
+      center: savedCenter,
+      zoom: savedZoom,
       minZoom: 3,
       disableDefaultUI: true,
       gestureHandling: 'greedy',
@@ -533,16 +573,7 @@ function GoogleMapComponent({
       mapInstanceRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getVisibleBounds])
-
-  // Update color scheme without recreating the map
-  useEffect(() => {
-    if (!mapInstanceRef.current) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(mapInstanceRef.current as any).setOptions({
-      colorScheme: colorScheme === 'dark' ? 'DARK' : 'LIGHT',
-    })
-  }, [colorScheme])
+  }, [getVisibleBounds, colorScheme])
   
   // Separate effect to update center when coordinates change
   useEffect(() => {
@@ -841,94 +872,101 @@ function GoogleMapComponent({
       allMarkers.push(marker)
     })
 
-    // Custom cluster renderer — 3-ring Google-style halo
-    const clusterRenderer: Renderer = {
-      render({ count, position }) {
-        const innerSize = Math.min(46, 30 + Math.log2(count) * 4)
-        const midSize = innerSize + 14
-        const outerSize = innerSize + 28
+    if (showClusters !== false) {
+      // Custom cluster renderer — 3-ring Google-style halo
+      const clusterRenderer: Renderer = {
+        render({ count, position }) {
+          const innerSize = Math.min(46, 30 + Math.log2(count) * 4)
+          const midSize = innerSize + 14
+          const outerSize = innerSize + 28
 
-        const outer = document.createElement('div')
-        outer.style.cssText = `
-          width: ${outerSize}px;
-          height: ${outerSize}px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 9999px;
-          background: rgba(37, 99, 235, 0.12);
-          cursor: pointer;
-          transform: translateY(${outerSize / 2}px);
-          user-select: none;
-          transition: background 0.15s ease;
-        `
+          const outer = document.createElement('div')
+          outer.style.cssText = `
+            width: ${outerSize}px;
+            height: ${outerSize}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: rgba(37, 99, 235, 0.12);
+            cursor: pointer;
+            transform: translateY(${outerSize / 2}px);
+            user-select: none;
+            transition: background 0.15s ease;
+          `
 
-        const mid = document.createElement('div')
-        mid.style.cssText = `
-          width: ${midSize}px;
-          height: ${midSize}px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 9999px;
-          background: rgba(37, 99, 235, 0.25);
-          transition: background 0.15s ease;
-        `
+          const mid = document.createElement('div')
+          mid.style.cssText = `
+            width: ${midSize}px;
+            height: ${midSize}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: rgba(37, 99, 235, 0.25);
+            transition: background 0.15s ease;
+          `
 
-        const inner = document.createElement('div')
-        inner.style.cssText = `
-          width: ${innerSize}px;
-          height: ${innerSize}px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 9999px;
-          background: ${THEME.accent};
-          color: #ffffff;
-          font-size: 13px;
-          font-weight: 600;
-          letter-spacing: -0.01em;
-          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
-          transition: background 0.15s ease, box-shadow 0.15s ease;
-        `
-        inner.textContent = String(count)
-        mid.appendChild(inner)
-        outer.appendChild(mid)
+          const inner = document.createElement('div')
+          inner.style.cssText = `
+            width: ${innerSize}px;
+            height: ${innerSize}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: ${THEME.accent};
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+          `
+          inner.textContent = String(count)
+          mid.appendChild(inner)
+          outer.appendChild(mid)
 
-        outer.addEventListener('mouseenter', () => {
-          outer.style.background = 'rgba(37, 99, 235, 0.18)'
-          mid.style.background = 'rgba(37, 99, 235, 0.35)'
-          inner.style.background = '#1d4ed8'
-          inner.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.55)'
-        })
-        outer.addEventListener('mouseleave', () => {
-          outer.style.background = 'rgba(37, 99, 235, 0.12)'
-          mid.style.background = 'rgba(37, 99, 235, 0.25)'
-          inner.style.background = THEME.accent
-          inner.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.45)'
-        })
+          outer.addEventListener('mouseenter', () => {
+            outer.style.background = 'rgba(37, 99, 235, 0.18)'
+            mid.style.background = 'rgba(37, 99, 235, 0.35)'
+            inner.style.background = '#1d4ed8'
+            inner.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.55)'
+          })
+          outer.addEventListener('mouseleave', () => {
+            outer.style.background = 'rgba(37, 99, 235, 0.12)'
+            mid.style.background = 'rgba(37, 99, 235, 0.25)'
+            inner.style.background = THEME.accent
+            inner.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.45)'
+          })
 
-        return new window.google.maps.marker.AdvancedMarkerElement({
-          position,
-          content: outer,
-          zIndex: 999999 + count,
-        })
-      },
+          return new window.google.maps.marker.AdvancedMarkerElement({
+            position,
+            content: outer,
+            zIndex: 999999 + count,
+          })
+        },
+      }
+
+      // Create clusterer — maxZoom:13 means zoom 14+ shows individual markers
+      clustererRef.current = new MarkerClusterer({
+        map: mapInstanceRef.current,
+        markers: allMarkers,
+        algorithm: new SuperClusterAlgorithm({ radius: 80, maxZoom: 13 }),
+        renderer: clusterRenderer,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onClusterClick: (_: any, cluster: any, map: any) => {
+          const currentZoom = map.getZoom() ?? 0
+          map.setCenter(cluster.position)
+          map.setZoom(currentZoom + 2)
+        },
+      })
+    } else {
+      // No clustering — attach each marker directly to the map
+      allMarkers.forEach(marker => {
+        marker.map = mapInstanceRef.current
+      })
     }
-
-    // Create clusterer — maxZoom:9 means zoom 10+ shows individual markers
-    clustererRef.current = new MarkerClusterer({
-      map: mapInstanceRef.current,
-      markers: allMarkers,
-      algorithm: new SuperClusterAlgorithm({ radius: 80, maxZoom: 13 }),
-      renderer: clusterRenderer,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onClusterClick: (_: any, cluster: any, map: any) => {
-        const currentZoom = map.getZoom() ?? 0
-        map.setCenter(cluster.position)
-        map.setZoom(currentZoom + 2)
-      },
-    })
 
     const currentRestaurantMarkers = restaurantMarkersRef.current
     const currentMarkerEventData = markerEventDataRef.current
@@ -949,7 +987,7 @@ function GoogleMapComponent({
         safeTriangleMoveHandlerRef.current = null
       }
     }
-  }, [restaurants, colorScheme, showHeatmap])
+  }, [restaurants, colorScheme, showHeatmap, showClusters])
 
   // Handle marker highlighting when hoveredRestaurantId changes
   useEffect(() => {
@@ -1032,6 +1070,8 @@ export default function GoogleMapsEmbed({
   resetView,
   onViewReset,
   showHeatmap,
+  showClusters,
+  theme,
 }: GoogleMapsEmbedProps) {
   return (
     <Wrapper
@@ -1058,6 +1098,8 @@ export default function GoogleMapsEmbed({
         resetView={resetView}
         onViewReset={onViewReset}
         showHeatmap={showHeatmap}
+        showClusters={showClusters}
+        theme={theme}
       />
     </Wrapper>
   )

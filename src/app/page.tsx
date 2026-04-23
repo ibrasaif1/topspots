@@ -35,6 +35,18 @@ type Restaurant = {
 
 type Bounds = { north: number; south: number; east: number; west: number };
 
+function formatPrice(priceMin?: number, priceMax?: number, priceLevel?: string): string {
+  if (priceMin && priceMax) return `$${priceMin} - $${priceMax}`;
+  const levelMap: Record<string, string> = {
+    PRICE_LEVEL_INEXPENSIVE: "Inexpensive",
+    PRICE_LEVEL_MODERATE: "Moderate Price",
+    PRICE_LEVEL_EXPENSIVE: "Expensive",
+    PRICE_LEVEL_VERY_EXPENSIVE: "Very Expensive",
+  };
+  if (priceLevel && levelMap[priceLevel]) return levelMap[priceLevel];
+  return "No price data available";
+}
+
 const ZOOM_THRESHOLD = 10;
 
 export default function Page() {
@@ -131,6 +143,7 @@ export default function Page() {
           cuisine?: string;
           priceMin?: number;
           priceMax?: number;
+          priceLevel?: string;
         }) => ({
           place_id: place.place_id,
           name: place.name,
@@ -138,9 +151,7 @@ export default function Page() {
           reviews: place.reviews,
           gps_coordinates: { latitude: place.lat, longitude: place.lng },
           cuisine: place.cuisine || "Restaurant",
-          priceRange: place.priceMin && place.priceMax 
-            ? `$${place.priceMin} - $${place.priceMax}` 
-            : ""
+          priceRange: formatPrice(place.priceMin, place.priceMax, place.priceLevel),
         }));
         
         setRestaurants(restaurants);
@@ -213,6 +224,7 @@ export default function Page() {
             primaryTypeDisplayName?: string;
             priceMin?: number;
             priceMax?: number;
+            priceLevel?: string;
           }) => ({
             place_id: place.placeId,
             name: place.displayName,
@@ -220,9 +232,7 @@ export default function Page() {
             reviews: place.userRatingCount,
             gps_coordinates: { latitude: place.lat, longitude: place.lng },
             cuisine: place.primaryTypeDisplayName || 'Restaurant',
-            priceRange: place.priceMin && place.priceMax 
-              ? `$${place.priceMin} - $${place.priceMax}` 
-              : ''
+            priceRange: formatPrice(place.priceMin, place.priceMax, place.priceLevel),
           }));
         
         // Add to existing restaurants

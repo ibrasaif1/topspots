@@ -1053,7 +1053,7 @@ function GoogleMapComponent({
   )
 }
 
-export default function GoogleMapsEmbed({
+export default React.memo(function GoogleMapsEmbed({
   location = "New York, NY",
   onPolygonChange,
   onPolygonValidation,
@@ -1103,4 +1103,4 @@ export default function GoogleMapsEmbed({
       />
     </Wrapper>
   )
-}
+})

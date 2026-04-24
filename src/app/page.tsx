@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useTransition, useDeferredValue } from "react";
 import GoogleMapsEmbed from "../components/GoogleMapsEmbed";
 import CategoryFilter from "@/components/CategoryFilter";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,11 @@ export default function Page() {
   const [resetView, setResetView] = useState(false);
   const [mockMode, setMockMode] = useState(false);
   const [usageInfo, setUsageInfo] = useState<{ used: number; limit: number } | null>(null);
-  
+
+  // Decouple expensive map prop updates from the input's controlled value
+  const deferredLocation = useDeferredValue(location);
+  const [, startTransition] = useTransition();
+
   // Viewport tracking state
   const [zoom, setZoom] = useState<number>(4);
   const [bounds, setBounds] = useState<Bounds | null>(null);
@@ -311,7 +315,7 @@ export default function Page() {
 
             <CategoryFilter
               selected={selectedCategories}
-              onChange={setSelectedCategories}
+              onChange={(cats) => startTransition(() => setSelectedCategories(cats))}
             />
 
             <div className="flex gap-2">
@@ -390,7 +394,7 @@ export default function Page() {
 
       <div className="w-full h-full">
         <GoogleMapsEmbed
-          location={location}
+          location={deferredLocation}
           onPolygonChange={setPolygon}
           onPolygonValidation={setIsPolygonValid}
           clearPolygon={clearPolygon}

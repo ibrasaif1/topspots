@@ -205,7 +205,7 @@ function GoogleMapComponent({
   const getPolygonColorsRef = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const heatmapRef = useRef<any>(null)
-  useEffect(() => { zoomRef.current = zoom ?? 0 }, [zoom])
+  // zoomRef is kept current via the zoom_changed and idle map listeners directly
   useEffect(() => { rightSidebarVisibleRef.current = rightSidebarVisible ?? false }, [rightSidebarVisible])
   useEffect(() => { isLockedRef.current = isLocked }, [isLocked])
   useEffect(() => { onPolygonChangeRef.current = onPolygonChange }, [onPolygonChange])
@@ -483,26 +483,28 @@ function GoogleMapComponent({
       }, 150) // Debounce by 150ms
     }
 
-    // Zoom change listener
+    // Zoom change listener — update zoomRef directly to avoid round-tripping
+    // through React state on every animation frame. onZoomChange is fired once
+    // per gesture from the idle listener below.
     map.addListener('zoom_changed', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const zoom = (map as any).getZoom()
-      if (zoom !== undefined && onZoomChangeRef.current) {
-        onZoomChangeRef.current(zoom)
+      const newZoom = (map as any).getZoom()
+      if (newZoom !== undefined) {
+        zoomRef.current = newZoom
       }
-      // Also update bounds when zoom changes
       debouncedBoundsChange()
     })
 
     // Bounds change listener (for panning)
     map.addListener('bounds_changed', debouncedBoundsChange)
 
-    // Initial zoom and bounds notification after map is idle
+    // Notify parent of zoom once per gesture (after animation settles)
     map.addListener('idle', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const zoom = (map as any).getZoom()
-      if (zoom !== undefined && onZoomChangeRef.current) {
-        onZoomChangeRef.current(zoom)
+      const settledZoom = (map as any).getZoom()
+      if (settledZoom !== undefined) {
+        zoomRef.current = settledZoom
+        onZoomChangeRef.current?.(settledZoom)
       }
       const visibleBounds = getVisibleBounds(map)
       if (visibleBounds && onBoundsChangeRef.current) {
@@ -959,6 +961,12 @@ function GoogleMapComponent({
           const currentZoom = map.getZoom() ?? 0
           map.setCenter(cluster.position)
           map.setZoom(currentZoom + 2)
+          // Offset center to compensate for left sidebar (1/3) and right sidebar (1/6 when visible)
+          const container = map.getDiv() as HTMLElement
+          const w = container.offsetWidth
+          const leftOffset = w * LEFT_SIDEBAR_FRACTION
+          const rightOffset = rightSidebarVisibleRef.current ? w * RIGHT_SIDEBAR_FRACTION : 0
+          map.panBy((rightOffset - leftOffset) / 2, 0)
         },
       })
     } else {

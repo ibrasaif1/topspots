@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "TopSpots",
   description: "Discover the best restaurants with 1000+ reviews",
   icons: {
-    icon: "/logo.png",
+    icon: "/icon.svg",
   },
 };
 
